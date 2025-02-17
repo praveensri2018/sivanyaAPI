@@ -19,8 +19,8 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           
-          # Add source repository
-          git remote add source https://github.com/praveensaneforceofficial/sivanyaapi.git
+          # Add source repository (ignore if already added)
+          git remote | grep source || git remote add source https://github.com/praveensaneforceofficial/sivanyaapi.git
           
           # Fetch latest changes from source
           git fetch source
@@ -28,8 +28,13 @@ jobs:
           # Checkout main branch
           git checkout main
           
-          # Merge source/main into target/main
-          git merge source/main --allow-unrelated-histories -m "Auto-sync from praveensaneforceofficial/sivanyaapi"
+          # Merge source/main into target/main with conflict handling
+          git merge source/main --allow-unrelated-histories -m "Auto-sync from praveensaneforceofficial/sivanyaapi" || (
+            echo "Merge conflict detected. Resolving by keeping source changes."
+            git checkout --theirs .
+            git add .
+            git commit -m "Resolved merge conflict by keeping source changes"
+          )
 
           # Push changes to target repo (praveensri2018/sivanyaAPI)
           git push origin main
