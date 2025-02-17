@@ -24,9 +24,12 @@ jobs:
           
           # Fetch latest changes from source
           git fetch source
+
+          # Checkout main branch
+          git checkout main
           
           # Merge source/main into target/main
           git merge source/main --allow-unrelated-histories -m "Auto-sync from praveensaneforceofficial/sivanyaapi"
-          
+
           # Push changes to target repo (praveensri2018/sivanyaAPI)
           git push origin main
