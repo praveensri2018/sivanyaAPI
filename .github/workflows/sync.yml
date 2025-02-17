@@ -1,0 +1,32 @@
+name: Sync Repository
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs every hour
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Target Repository
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Add Source Repository and Sync
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          
+          # Add source repository
+          git remote add source https://github.com/praveensaneforceofficial/sivanyaapi.git
+          
+          # Fetch latest changes from source
+          git fetch source
+          
+          # Merge source/main into target/main
+          git merge source/main --allow-unrelated-histories -m "Auto-sync from praveensaneforceofficial/sivanyaapi"
+          
+          # Push changes to target repo (praveensri2018/sivanyaAPI)
+          git push origin main
