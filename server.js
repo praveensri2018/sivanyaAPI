@@ -40,45 +40,31 @@ app.post('/register', (req, res) => {
 });
 
 // Sample POST request for logging in a user
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    // Query the database for the user with the provided email
-    const query = 'SELECT * FROM users WHERE email = $1';
-    const values = [email];
+    try {
+        const query = 'SELECT * FROM users WHERE email = $1';
+        const { rows } = await client.query(query, [email]);
 
-    client.query(query, values, (err, result) => {
-        if (err) {
-            console.error(err);
-            res.status(500).send('Error processing login');
-            return;
+        if (rows.length === 0) {
+            return res.status(400).send('Invalid email or password');
         }
 
-        if (result.rows.length === 0) {
-            // User not found
-            res.status(400).send('Invalid email or password');
+        const user = rows[0];
+
+        // Compare provided password with stored hash
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+
+        if (isMatch) {
+            res.status(200).send('User logged in successfully');
         } else {
-            // Compare the provided password with the stored password hash
-            const user = result.rows[0]; // Get the first user (only one should exist with the same email)
-
-            // Check if password matches the stored hash
-            bcrypt.compare(password, user.password_hash, (err, isMatch) => {
-                if (err) {
-                    console.error(err);
-                    res.status(500).send('Error comparing passwords');
-                    return;
-                }
-
-                if (isMatch) {
-                    // Passwords match, login successful
-                    res.status(200).send('User logged in successfully');
-                } else {
-                    // Passwords do not match
-                    res.status(400).send('Invalid email or password');
-                }
-            });
+            res.status(400).send('Invalid email or password');
         }
-    });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error processing login');
+    }
 });
 
 // Start server
