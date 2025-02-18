@@ -26,9 +26,14 @@ app.post('/register', async (req, res) => {
     const { email, phone, fullName, password } = req.body;
 
     try {
+        // Ensure the password is provided
+        if (!password) {
+            return res.status(400).send('Password is required');
+        }
+
         // Hash the password before storing it in the database
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const saltRounds = 10; // You can adjust the number of salt rounds if needed
+        const hashedPassword = await bcrypt.hash(password, saltRounds); // Ensure both data and salt are passed
 
         // Insert user into PostgreSQL with the hashed password
         const query = 'INSERT INTO users (email, phone, full_name, password_hash) VALUES ($1, $2, $3, $4)';
@@ -42,6 +47,7 @@ app.post('/register', async (req, res) => {
         res.status(500).send('Error registering user');
     }
 });
+
 
 
 // Sample POST request for logging in a user
