@@ -22,22 +22,27 @@ client.connect();
 app.use(bodyParser.json());
 
 // Sample POST request for registering a user
-app.post('/register', (req, res) => {
-    const { email, phone, fullName, passwordHash } = req.body;
+app.post('/register', async (req, res) => {
+    const { email, phone, fullName, password } = req.body;
 
-    // Insert user into PostgreSQL
-    const query = 'INSERT INTO users (email, phone, full_name, password_hash) VALUES ($1, $2, $3, $4)';
-    const values = [email, phone, fullName, passwordHash];
+    try {
+        // Hash the password before storing it in the database
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    client.query(query, values, (err, result) => {
-        if (err) {
-            console.error(err);
-            res.status(500).send('Error registering user');
-        } else {
-            res.status(200).send('User registered successfully');
-        }
-    });
+        // Insert user into PostgreSQL with the hashed password
+        const query = 'INSERT INTO users (email, phone, full_name, password_hash) VALUES ($1, $2, $3, $4)';
+        const values = [email, phone, fullName, hashedPassword];
+
+        await client.query(query, values);
+
+        res.status(200).send('User registered successfully');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error registering user');
+    }
 });
+
 
 // Sample POST request for logging in a user
 app.post('/login', async (req, res) => {
