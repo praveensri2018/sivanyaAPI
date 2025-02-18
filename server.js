@@ -48,7 +48,7 @@ app.post('/login', async (req, res) => {
         const { rows } = await client.query(query, [email]);
 
         if (rows.length === 0) {
-            return res.status(400).send('Invalid email or password');
+            return res.status(400).send('Invalid email');
         }
 
         const user = rows[0];
@@ -59,7 +59,7 @@ app.post('/login', async (req, res) => {
         if (isMatch) {
             res.status(200).send('User logged in successfully');
         } else {
-            res.status(400).send('Invalid email or password');
+            res.status(400).send('Invalid password');
         }
     } catch (err) {
         console.error(err);
