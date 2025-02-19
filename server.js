@@ -78,6 +78,25 @@ app.post('/login', async (req, res) => {
     }
 });
 
+app.post('/getUser', async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const query = 'SELECT full_name, email, phone, address FROM users WHERE email = $1';
+        const { rows } = await client.query(query, [email]);
+
+        if (rows.length === 0) {
+            return res.status(404).send('User not found');
+        }
+
+        res.status(200).json(rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error retrieving user details');
+    }
+});
+
+
 // Start server
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
