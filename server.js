@@ -96,6 +96,36 @@ app.post('/getUser', async (req, res) => {
     }
 });
 
+app.post('/updateUser', async (req, res) => {
+    const { email, full_name, phone, address } = req.body;
+
+    try {
+        // Ensure that email is provided (as it's the unique identifier)
+        if (!email) {
+            return res.status(400).send('Email is required to update profile');
+        }
+
+        // Update user details in PostgreSQL
+        const query = `
+            UPDATE users 
+            SET full_name = $1, phone = $2, address = $3
+            WHERE email = $4
+            RETURNING full_name, email, phone, address`;
+        const values = [full_name, phone, address, email];
+
+        const { rows } = await client.query(query, values);
+
+        if (rows.length === 0) {
+            return res.status(404).send('User not found');
+        }
+
+        res.status(200).json({ message: 'Profile updated successfully', user: rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error updating user profile');
+    }
+});
+
 
 // Start server
 app.listen(port, () => {
