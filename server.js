@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 const cors = require("cors"); // Allows frontend access to backend
 require("dotenv").config(); // Load environment variables
 
@@ -22,6 +23,11 @@ app.use(bodyParser.json());
 app.use(cors()); // Enable CORS for frontend access
 app.use("/uploads", express.static("uploads")); // Serve uploaded images
 
+const uploadDir = "uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // Multer Storage Configuration for File Uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -32,7 +38,7 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage: storage });
-
+module.exports = upload;
 // ------------------------ USER REGISTRATION ------------------------
 app.post("/register", async (req, res) => {
   const { email, phone, fullName, password } = req.body;
