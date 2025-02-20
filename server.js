@@ -1,146 +1,156 @@
-const express = require('express');
-const { Client } = require('pg');
-const bodyParser = require('body-parser');
-const bcrypt = require('bcrypt'); // You can use bcrypt to compare password hashes
-require('dotenv').config(); // Load environment variables
+const express = require("express");
+const { Client } = require("pg");
+const bodyParser = require("body-parser");
+const bcrypt = require("bcrypt");
+const multer = require("multer");
+const path = require("path");
+const cors = require("cors"); // Allows frontend access to backend
+require("dotenv").config(); // Load environment variables
 
 const app = express();
 const port = 3000;
 
-// PostgreSQL connection details from .env file
+// PostgreSQL connection
 const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
-
-// Connect to PostgreSQL
 client.connect();
 
-// Middleware to parse JSON bodies
+// Middleware
 app.use(bodyParser.json());
+app.use(cors()); // Enable CORS for frontend access
+app.use("/uploads", express.static("uploads")); // Serve uploaded images
 
-// Sample POST request for registering a user
-app.post('/register', async (req, res) => {
-    const { email, phone, fullName, password } = req.body;
+// Multer Storage Configuration for File Uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/"); // Images will be stored in "uploads" directory
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname)); // Rename file with timestamp
+  },
+});
+const upload = multer({ storage: storage });
 
-    try {
-        // Ensure the password is provided
-        if (!password) {
-            return res.status(400).send('Password is required');
-        }
+// ------------------------ USER REGISTRATION ------------------------
+app.post("/register", async (req, res) => {
+  const { email, phone, fullName, password } = req.body;
 
-        // Hash the password before storing it in the database
-        const saltRounds = 10; // You can adjust the number of salt rounds if needed
-        const hashedPassword = await bcrypt.hash(password, saltRounds); // Ensure both data and salt are passed
+  try {
+    if (!password) return res.status(400).send("Password is required");
 
-        // Insert user into PostgreSQL with the hashed password
-        const query = 'INSERT INTO users (email, phone, full_name, password_hash) VALUES ($1, $2, $3, $4)';
-        const values = [email, phone, fullName, hashedPassword];
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        await client.query(query, values);
+    const query = `INSERT INTO users (email, phone, full_name, password_hash) VALUES ($1, $2, $3, $4)`;
+    await client.query(query, [email, phone, fullName, hashedPassword]);
 
-        res.status(200).send('User registered successfully');
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error registering user');
-    }
+    res.status(200).send("User registered successfully");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error registering user");
+  }
 });
 
+// ------------------------ USER LOGIN ------------------------
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
 
+  try {
+    const query = "SELECT * FROM users WHERE email = $1";
+    const { rows } = await client.query(query, [email]);
 
-// Sample POST request for logging in a user
-app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+    if (rows.length === 0) return res.status(400).send("Invalid email");
 
-    try {
-        const query = 'SELECT * FROM users WHERE email = $1';
-        const { rows } = await client.query(query, [email]);
+    const user = rows[0];
+    const isMatch = await bcrypt.compare(password, user.password_hash);
 
-        if (rows.length === 0) {
-            return res.status(400).send('Invalid email');
-        }
-
-        const user = rows[0];
-
-        // Compare provided password with stored hash
-        const isMatch = await bcrypt.compare(password, user.password_hash);
-
-        if (isMatch) {
-            res.status(200).send('User logged in successfully');
-        } else {
-            res.status(400).send('Invalid password');
-        }
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error processing login');
+    if (isMatch) {
+      res.status(200).send("User logged in successfully");
+    } else {
+      res.status(400).send("Invalid password");
     }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error processing login");
+  }
 });
 
-app.post('/getUser', async (req, res) => {
-    const { email } = req.body;
+// ------------------------ UPLOAD PRODUCT ------------------------
+app.post("/uploadProduct", upload.single("image"), async (req, res) => {
+  try {
+    const { name, description, price, quantity } = req.body;
+    if (!req.file) return res.status(400).send("Image is required");
 
-    try {
-        const query = 'SELECT full_name, email, phone, address FROM users WHERE email = $1';
-        const { rows } = await client.query(query, [email]);
+    const imageUrl = `/uploads/${req.file.filename}`;
 
-        if (rows.length === 0) {
-            return res.status(404).send('User not found');
-        }
+    const query = `
+      INSERT INTO products (name, description, price, stock_quantity, image_url) 
+      VALUES ($1, $2, $3, $4, $5)`;
+    const values = [name, description, price, quantity, imageUrl];
 
-        res.status(200).json(rows[0]);
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error retrieving user details');
-    }
+    await client.query(query, values);
+    res.status(200).json({ message: "Product uploaded successfully", imageUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error uploading product");
+  }
 });
 
-app.post('/updateUser', async (req, res) => {
-    const { email, full_name, phone, address } = req.body;
-
-    try {
-        // Ensure that email is provided (as it's the unique identifier)
-        if (!email) {
-            return res.status(400).send('Email is required to update profile');
-        }
-
-        // Update user details in PostgreSQL
-        const query = `
-            UPDATE users 
-            SET full_name = $1, phone = $2, address = $3
-            WHERE email = $4
-            RETURNING full_name, email, phone, address`;
-        const values = [full_name, phone, address, email];
-
-        const { rows } = await client.query(query, values);
-
-        if (rows.length === 0) {
-            return res.status(404).send('User not found');
-        }
-
-        res.status(200).json({ message: 'Profile updated successfully', user: rows[0] });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error updating user profile');
-    }
+// ------------------------ GET PRODUCTS ------------------------
+app.get("/getProducts", async (req, res) => {
+  try {
+    const query = "SELECT id, name, description, price, stock_quantity, image_url FROM products";
+    const { rows } = await client.query(query);
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error retrieving products");
+  }
 });
 
-app.post('/getProducts', async (req, res) => {
-    try {
-        // Query to fetch all products
-        const query = 'SELECT id, name, description, price, stock_quantity, image_url FROM products';
-        const { rows } = await client.query(query);
+// ------------------------ UPDATE USER ------------------------
+app.post("/updateUser", async (req, res) => {
+  const { email, full_name, phone, address } = req.body;
 
-        res.status(200).json(rows); // Send the list of products
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error retrieving products');
-    }
+  try {
+    if (!email) return res.status(400).send("Email is required");
+
+    const query = `
+      UPDATE users 
+      SET full_name = $1, phone = $2, address = $3
+      WHERE email = $4
+      RETURNING full_name, email, phone, address`;
+    const values = [full_name, phone, address, email];
+
+    const { rows } = await client.query(query, values);
+    if (rows.length === 0) return res.status(404).send("User not found");
+
+    res.status(200).json({ message: "Profile updated successfully", user: rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error updating profile");
+  }
 });
 
+// ------------------------ GET USER INFO ------------------------
+app.post("/getUser", async (req, res) => {
+  const { email } = req.body;
 
-// Start server
+  try {
+    const query = "SELECT full_name, email, phone, address FROM users WHERE email = $1";
+    const { rows } = await client.query(query, [email]);
+
+    if (rows.length === 0) return res.status(404).send("User not found");
+
+    res.status(200).json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error retrieving user details");
+  }
+});
+
+// ------------------------ SERVER START ------------------------
 app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+  console.log(`Server running on http://localhost:${port}`);
 });
