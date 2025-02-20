@@ -126,6 +126,19 @@ app.post('/updateUser', async (req, res) => {
     }
 });
 
+app.post('/getProducts', async (req, res) => {
+    try {
+        // Query to fetch all products
+        const query = 'SELECT id, name, description, price, stock_quantity, image_url FROM products';
+        const { rows } = await client.query(query);
+
+        res.status(200).json(rows); // Send the list of products
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error retrieving products');
+    }
+});
+
 
 // Start server
 app.listen(port, () => {
