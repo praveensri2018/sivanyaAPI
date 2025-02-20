@@ -23,22 +23,23 @@ app.use(bodyParser.json());
 app.use(cors()); // Enable CORS for frontend access
 app.use("/uploads", express.static("uploads")); // Serve uploaded images
 
-const uploadDir = "uploads";
+const uploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer Storage Configuration for File Uploads
+// Multer Storage Configuration
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/"); // Images will be stored in "uploads" directory
+    cb(null, uploadDir); // Save images in "uploads" directory
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + path.extname(file.originalname)); // Rename file with timestamp
   },
 });
+
 const upload = multer({ storage: storage });
-module.exports = upload;
+
 // ------------------------ USER REGISTRATION ------------------------
 app.post("/register", async (req, res) => {
   const { email, phone, fullName, password } = req.body;
