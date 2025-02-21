@@ -1,25 +1,31 @@
 const express = require('express');
 const { Client } = require('pg');
 const bodyParser = require('body-parser');
-const bcrypt = require('bcrypt'); // You can use bcrypt to compare password hashes
-require('dotenv').config(); // Load environment variables
+const bcrypt = require('bcrypt');
+const fileUpload = require('express-fileupload');
+const cloudinary = require('cloudinary').v2;
+require('dotenv').config();
 
 const app = express();
 const port = 3000;
 
-// PostgreSQL connection details from .env file
-const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Connect to PostgreSQL
+// PostgreSQL connection
+const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+});
 client.connect();
 
-// Middleware to parse JSON bodies
+// Middleware
 app.use(bodyParser.json());
+app.use(fileUpload({ useTempFiles: true }));
 
 // Sample POST request for registering a user
 app.post('/register', async (req, res) => {
@@ -138,6 +144,36 @@ app.post('/getProducts', async (req, res) => {
         res.status(500).send('Error retrieving products');
     }
 });
+
+// Add Product with Image Upload
+app.post('/addProduct', async (req, res) => {
+    const { name, description, price, stock_quantity } = req.body;
+    let imageUrl = null;
+
+    try {
+        if (!name || !description || !price || !stock_quantity) {
+            return res.status(400).send('All fields are required');
+        }
+
+        // Upload image if provided
+        if (req.files && req.files.image) {
+            const result = await cloudinary.uploader.upload(req.files.image.tempFilePath);
+            imageUrl = result.secure_url;
+        }
+
+        // Insert product into database
+        const query = `INSERT INTO products (name, description, price, stock_quantity, image_url) 
+                       VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+        const values = [name, description, price, stock_quantity, imageUrl];
+
+        const { rows } = await client.query(query, values);
+        res.status(200).json({ message: 'Product added successfully', product: rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error adding product');
+    }
+});
+
 
 
 // Start server
