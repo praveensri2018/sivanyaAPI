@@ -232,6 +232,29 @@ app.post('/removeFavorite', async (req, res) => {
     }
 });
 
+app.post('/getProductById', async (req, res) => {
+    const { productId } = req.body;
+
+    try {
+        if (!productId) {
+            return res.status(400).send('Product ID is required');
+        }
+
+        // Query to fetch the product by ID
+        const query = 'SELECT id, name, description, price, stock_quantity, image_url FROM products WHERE id = $1';
+        const { rows } = await client.query(query, [productId]);
+
+        if (rows.length === 0) {
+            return res.status(404).send('Product not found');
+        }
+
+        res.status(200).json(rows[0]); // Return the product details
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error retrieving product details');
+    }
+});
+
 
 // Start server
 app.listen(port, () => {
