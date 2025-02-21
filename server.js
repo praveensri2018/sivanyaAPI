@@ -148,7 +148,6 @@ app.post('/getProducts', async (req, res) => {
 // Add Product with Image Upload
 app.post('/addProduct', async (req, res) => {
     const { imageUrl,name, description, price, quantity } = req.body;
-    let imageUrl = null;
 
     try {
         if (!name || !description || !price || !imageUrl|| !quantity) {
