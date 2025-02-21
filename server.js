@@ -155,7 +155,7 @@ app.post('/addProduct', async (req, res) => {
         }
 
         // Insert product into database
-        const query = `INSERT INTO products (name, description, price, quantity, imageUrl) 
+        const query = `INSERT INTO products (name, description, price, stock_quantity, image_url ) 
                        VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const values = [name, description, price, quantity, imageUrl];
 
