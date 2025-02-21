@@ -147,24 +147,18 @@ app.post('/getProducts', async (req, res) => {
 
 // Add Product with Image Upload
 app.post('/addProduct', async (req, res) => {
-    const { name, description, price, stock_quantity } = req.body;
+    const { imageUrl,name, description, price, quantity } = req.body;
     let imageUrl = null;
 
     try {
-        if (!name || !description || !price || !stock_quantity) {
+        if (!name || !description || !price || !imageUrl|| !quantity) {
             return res.status(400).send('All fields are required');
         }
 
-        // Upload image if provided
-        if (req.files && req.files.image) {
-            const result = await cloudinary.uploader.upload(req.files.image.tempFilePath);
-            imageUrl = result.secure_url;
-        }
-
         // Insert product into database
-        const query = `INSERT INTO products (name, description, price, stock_quantity, image_url) 
+        const query = `INSERT INTO products (name, description, price, quantity, imageUrl) 
                        VALUES ($1, $2, $3, $4, $5) RETURNING *`;
-        const values = [name, description, price, stock_quantity, imageUrl];
+        const values = [name, description, price, quantity, imageUrl];
 
         const { rows } = await client.query(query, values);
         res.status(200).json({ message: 'Product added successfully', product: rows[0] });
