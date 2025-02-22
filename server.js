@@ -242,6 +242,30 @@ app.post('/checkFavorite', async (req, res) => {
     }
 });
 
+app.post('/getFavorites', async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        if (!email) {
+            return res.status(400).send('User email is required');
+        }
+
+        // Query to fetch user's favorite products
+        const query = `
+            SELECT p.id, p.name, p.description, p.price, p.stock_quantity, p.image_url
+            FROM products p
+            JOIN favorites f ON p.id = f.product_id
+            WHERE f.user_email = $1
+        `;
+        const { rows } = await client.query(query, [email]);
+
+        res.status(200).json(rows); // Send the list of favorite products
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error retrieving favorite products');
+    }
+});
+
 
 // Start server
 app.listen(port, () => {
