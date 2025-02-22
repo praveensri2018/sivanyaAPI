@@ -187,33 +187,7 @@ app.post('/addFavorite', async (req, res) => {
     }
 });
 
-// Get favorite products for a user
-app.post('/getFavorites', async (req, res) => {
-    const { email } = req.body;
-
-    try {
-        if (!email) {
-            return res.status(400).send('User email is required');
-        }
-
-        // Query to fetch user's favorite products
-        const query = `
-            SELECT p.id, p.name, p.description, p.price, p.stock_quantity, p.image_url
-            FROM products p
-            JOIN favorites f ON p.id = f.product_id
-            WHERE f.user_email = $1
-        `;
-        const { rows } = await client.query(query, [email]);
-
-        res.status(200).json(rows); // Send the list of favorite products
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error retrieving favorite products');
-    }
-});
-
-// Remove a product from favorites
-app.post('/removeFavorite', async (req, res) => {
+app.post('/toggleFavorite', async (req, res) => {
     const { email, product_id } = req.body;
 
     try {
@@ -221,37 +195,24 @@ app.post('/removeFavorite', async (req, res) => {
             return res.status(400).send('User email and product ID are required');
         }
 
-        // Delete the favorite product entry
-        const query = `DELETE FROM favorites WHERE user_email = $1 AND product_id = $2`;
-        await client.query(query, [email, product_id]);
+        // Check if the product is already in favorites
+        const checkQuery = `SELECT * FROM favorites WHERE user_email = $1 AND product_id = $2`;
+        const { rows } = await client.query(checkQuery, [email, product_id]);
 
-        res.status(200).json({ message: 'Product removed from favorites' });
+        if (rows.length > 0) {
+            // If exists, remove it
+            const deleteQuery = `DELETE FROM favorites WHERE user_email = $1 AND product_id = $2`;
+            await client.query(deleteQuery, [email, product_id]);
+            return res.status(200).json({ message: 'Product removed from favorites', isFavorite: false });
+        } else {
+            // Otherwise, add it
+            const insertQuery = `INSERT INTO favorites (user_email, product_id) VALUES ($1, $2)`;
+            await client.query(insertQuery, [email, product_id]);
+            return res.status(200).json({ message: 'Product added to favorites', isFavorite: true });
+        }
     } catch (err) {
         console.error(err);
-        res.status(500).send('Error removing favorite product');
-    }
-});
-
-app.post('/getProductById', async (req, res) => {
-    const { productId } = req.body;
-
-    try {
-        if (!productId) {
-            return res.status(400).send('Product ID is required');
-        }
-
-        // Query to fetch the product by ID
-        const query = 'SELECT id, name, description, price, stock_quantity, image_url FROM products WHERE id = $1';
-        const { rows } = await client.query(query, [productId]);
-
-        if (rows.length === 0) {
-            return res.status(404).send('Product not found');
-        }
-
-        res.status(200).json(rows[0]); // Return the product details
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error retrieving product details');
+        res.status(500).send('Error toggling favorite product');
     }
 });
 
