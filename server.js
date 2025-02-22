@@ -219,6 +219,29 @@ app.post('/toggleFavorite', async (req, res) => {
     }
 });
 
+app.post('/checkFavorite', async (req, res) => {
+    const { userEmail, productId } = req.body;
+
+    try {
+        if (!userEmail || !productId) {
+            return res.status(400).send('User email and product ID are required');
+        }
+
+        // Check if the product is in the favorites list
+        const query = `SELECT * FROM favorites WHERE user_email = $1 AND product_id = $2`;
+        const { rows } = await client.query(query, [userEmail, productId]);
+
+        if (rows.length > 0) {
+            return res.status(200).json({ isFavorite: true });
+        } else {
+            return res.status(200).json({ isFavorite: false });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error checking favorite status');
+    }
+});
+
 
 // Start server
 app.listen(port, () => {
