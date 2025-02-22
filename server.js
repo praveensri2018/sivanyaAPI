@@ -167,47 +167,27 @@ app.post('/addProduct', async (req, res) => {
     }
 });
 
-// Add a product to favorites
-app.post('/addFavorite', async (req, res) => {
-    const { email, product_id } = req.body;
-
-    try {
-        if (!email || !product_id) {
-            return res.status(400).send('User email and product ID are required');
-        }
-
-        // Insert favorite into the database
-        const query = `INSERT INTO favorites (user_email, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`;
-        await client.query(query, [email, product_id]);
-
-        res.status(200).json({ message: 'Product added to favorites' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error adding favorite product');
-    }
-});
-
 app.post('/toggleFavorite', async (req, res) => {
-    const { email, product_id } = req.body;
+    const { userEmail, productId } = req.body;
 
     try {
-        if (!email || !product_id) {
+        if (!userEmail || !productId) {
             return res.status(400).send('User email and product ID are required');
         }
 
         // Check if the product is already in favorites
         const checkQuery = `SELECT * FROM favorites WHERE user_email = $1 AND product_id = $2`;
-        const { rows } = await client.query(checkQuery, [email, product_id]);
+        const { rows } = await client.query(checkQuery, [userEmail, productId]);
 
         if (rows.length > 0) {
             // If exists, remove it
             const deleteQuery = `DELETE FROM favorites WHERE user_email = $1 AND product_id = $2`;
-            await client.query(deleteQuery, [email, product_id]);
+            await client.query(deleteQuery, [userEmail, productId]);
             return res.status(200).json({ message: 'Product removed from favorites', isFavorite: false });
         } else {
             // Otherwise, add it
             const insertQuery = `INSERT INTO favorites (user_email, product_id) VALUES ($1, $2)`;
-            await client.query(insertQuery, [email, product_id]);
+            await client.query(insertQuery, [userEmail, productId]);
             return res.status(200).json({ message: 'Product added to favorites', isFavorite: true });
         }
     } catch (err) {
