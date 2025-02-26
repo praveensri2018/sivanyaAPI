@@ -27,6 +27,48 @@ client.connect();
 app.use(bodyParser.json());
 app.use(fileUpload({ useTempFiles: true }));
 
+
+// New Database sivanyaApk Start
+
+// Sample POST request for logging in a user
+app.post('/login', async (req, res) => {
+    const { mobile, password } = req.body;
+
+    try {
+        const query = 'SELECT * FROM public.Users WHERE phone = $1 AND is_admin = TRUE';
+        const { rows } = await client.query(query, [mobile]);
+
+        if (rows.length === 0) {
+            return res.status(400).send('Invalid mobile');
+        }
+
+        const user = rows[0];
+
+        // Compare provided password with stored hash
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+
+        if (isMatch) {
+            res.status(200).send('User logged in successfully');
+        } else {
+            res.status(400).send('Invalid password');
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error processing login');
+    }
+});
+
+
+
+
+
+
+
+
+
+
+// New Database sivanyaApk End
+
 // Sample POST request for registering a user
 app.post('/register', async (req, res) => {
     const { email, phone, fullName, password } = req.body;
@@ -56,33 +98,7 @@ app.post('/register', async (req, res) => {
 
 
 
-// Sample POST request for logging in a user
-app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
 
-    try {
-        const query = 'SELECT * FROM users WHERE email = $1';
-        const { rows } = await client.query(query, [email]);
-
-        if (rows.length === 0) {
-            return res.status(400).send('Invalid email');
-        }
-
-        const user = rows[0];
-
-        // Compare provided password with stored hash
-        const isMatch = await bcrypt.compare(password, user.password_hash);
-
-        if (isMatch) {
-            res.status(200).send('User logged in successfully');
-        } else {
-            res.status(400).send('Invalid password');
-        }
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error processing login');
-    }
-});
 
 app.post('/getUser', async (req, res) => {
     const { email } = req.body;
