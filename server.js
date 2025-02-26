@@ -39,7 +39,7 @@ app.post('/login', async (req, res) => {
     }
 
     try {
-        const query = 'SELECT * FROM public.Users WHERE phone = $1 AND is_admin = TRUE';
+        const query = 'SELECT * FROM public.Users WHERE phone = $1';
         const { rows } = await client.query(query, [mobile]);
 
         if (rows.length === 0) {
@@ -52,7 +52,7 @@ app.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password_hash);
 
         if (isMatch) {
-            res.status(200).json({ message: 'User logged in successfully', user: { id: user.user_id, name: user.name, email: user.email } });
+            res.status(200).json({ message: 'User logged in successfully', user: { id: user.user_id, is_admin:user.is_admin, user_type: user.user_type, name: user.name, email: user.email } });
         } else {
             res.status(400).json({ error: 'Invalid password' });
         }
