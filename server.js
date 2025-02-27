@@ -64,6 +64,41 @@ app.post('/login', async (req, res) => {
 
 
 
+app.post('/register', async (req, res) => {
+    const { name, email, password, phone, address, user_type } = req.body;
+
+    if (!name || !email || !password || !user_type) {
+        return res.status(400).json({ error: 'Name, email, password, and user type are required' });
+    }
+
+    try {
+        // Check if the email already exists
+        const existingUser = await client.query('SELECT * FROM public.Users WHERE email = $1', [email]);
+
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ error: 'Email already exists' });
+        }
+
+        // Hash the password
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // Insert user with is_admin set to false
+        const query = `
+            INSERT INTO public.Users (name, email, password_hash, phone, address, user_type, is_admin)
+            VALUES ($1, $2, $3, $4, $5, $6, FALSE) RETURNING user_id, name, email, user_type, is_admin
+        `;
+        const values = [name, email, hashedPassword, phone, address, user_type];
+
+        const { rows } = await client.query(query, values);
+
+        res.status(201).json({ message: 'User registered successfully', user: rows[0] });
+
+    } catch (err) {
+        console.error('Registration error:', err);
+        res.status(500).json({ error: 'Error processing registration' });
+    }
+});
 
 
 
