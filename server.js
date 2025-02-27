@@ -104,6 +104,58 @@ app.post('/register', async (req, res) => {
 
 
 
+app.post('/categories', async (req, res) => {
+    const { category_name } = req.body;
+
+    if (!category_name) {
+        return res.status(400).json({ error: 'Category name is required' });
+    }
+
+    try {
+        const query = 'INSERT INTO ProductCategories (category_name) VALUES ($1) RETURNING *';
+        const { rows } = await client.query(query, [category_name]);
+
+        res.status(201).json({ message: 'Category created', category: rows[0] });
+    } catch (err) {
+        console.error('Error creating category:', err);
+        res.status(500).json({ error: 'Error creating category' });
+    }
+});
+
+// Get All Categories
+app.get('/categories', async (req, res) => {
+    try {
+        const query = 'SELECT * FROM ProductCategories ORDER BY category_name ASC';
+        const { rows } = await client.query(query);
+
+        res.status(200).json({ categories: rows });
+    } catch (err) {
+        console.error('Error fetching categories:', err);
+        res.status(500).json({ error: 'Error fetching categories' });
+    }
+});
+
+// Delete Category
+app.delete('/categories/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const query = 'DELETE FROM ProductCategories WHERE category_id = $1 RETURNING *';
+        const { rows } = await client.query(query, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Category not found' });
+        }
+
+        res.status(200).json({ message: 'Category deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting category:', err);
+        res.status(500).json({ error: 'Error deleting category' });
+    }
+});
+
+
+
 
 // New Database sivanyaApk End
 
