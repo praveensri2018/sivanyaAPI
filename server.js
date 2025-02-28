@@ -165,6 +165,60 @@ app.delete('/categories/:id', async (req, res) => {
 });
 
 
+app.post('/api/products', async (req, res) => {
+    const { name, category_id, description, sizes, prices } = req.body;
+
+    try {
+        // Insert product details
+        const productResult = await client.query(
+            'INSERT INTO public.Products (name, category_id, description) VALUES ($1, $2, $3) RETURNING product_id',
+            [name, category_id, description]
+        );
+        const productId = productResult.rows[0].product_id;
+
+        // Insert product stock
+        for (const size of sizes) {
+            await client.query(
+                'INSERT INTO public.ProductStock (product_id, size, quantity) VALUES ($1, $2, $3)',
+                [productId, size.size, size.quantity]
+            );
+        }
+
+        // Insert product pricing
+        for (const price of prices) {
+            await client.query(
+                'INSERT INTO public.ProductPricing (product_id, size, user_type, price) VALUES ($1, $2, $3, $4)',
+                [productId, price.size, price.user_type, price.price]
+            );
+        }
+
+        res.status(201).json({ productId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/api/products/:productId/images', async (req, res) => {
+    const { productId } = req.params;
+    const files = req.files.images;
+
+    try {
+        for (const file of files) {
+            const result = await cloudinary.uploader.upload(file.tempFilePath);
+            await client.query(
+                'INSERT INTO public.ProductImages (product_id, image_url) VALUES ($1, $2)',
+                [productId, result.secure_url]
+            );
+        }
+
+        res.status(201).json({ message: 'Images uploaded successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // New Database sivanyaApk End
 
 // Start server
