@@ -219,6 +219,54 @@ app.post('/api/products/:productId/images', async (req, res) => {
     }
 });
 
+// Get all products
+app.get('/products', async (req, res) => {
+    try {
+        const query = `
+            SELECT p.product_id, p.name, p.category_id, p.description, 
+                COALESCE(json_agg(DISTINCT ps) FILTER (WHERE ps.size IS NOT NULL), '[]') AS stock,
+                COALESCE(json_agg(DISTINCT pi) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images
+            FROM Products p
+            LEFT JOIN ProductStock ps ON p.product_id = ps.product_id
+            LEFT JOIN ProductImages pi ON p.product_id = pi.product_id
+            GROUP BY p.product_id;
+        `;
+        const result = await client.query(query);
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Error fetching products:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Get product by ID
+app.get('/products/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT p.product_id, p.name, p.category_id, p.description, 
+                COALESCE(json_agg(DISTINCT ps) FILTER (WHERE ps.size IS NOT NULL), '[]') AS stock,
+                COALESCE(json_agg(DISTINCT pi) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images
+            FROM Products p
+            LEFT JOIN ProductStock ps ON p.product_id = ps.product_id
+            LEFT JOIN ProductImages pi ON p.product_id = pi.product_id
+            WHERE p.product_id = $1
+            GROUP BY p.product_id;
+        `;
+        const result = await client.query(query, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Product not found" });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error("Error fetching product:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+
 // New Database sivanyaApk End
 
 // Start server
