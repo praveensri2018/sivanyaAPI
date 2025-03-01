@@ -179,8 +179,8 @@ app.post('/api/products', async (req, res) => {
         // Insert product stock
         for (const size of sizes) {
             await client.query(
-                'INSERT INTO public.ProductStock (product_id, size, quantity) VALUES ($1, $2, $3)',
-                [productId, size.size, size.quantity]
+                'INSERT INTO public.ProductStock (product_id, size, quantity,stock_type) VALUES ($1, $2, $3, $4)',
+                [productId, size.size, size.quantity,'IN']
             );
         }
 
