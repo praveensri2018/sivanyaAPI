@@ -277,8 +277,8 @@ app.post('/favorites', async (req, res) => {
         const query = `
             INSERT INTO public.Favorites (user_id, product_id)
             VALUES ($1, $2)
-            ON CONFLICT (user_id, product_id) DO NOTHING
-            RETURNING *;
+            ON CONFLICT (user_id, product_id) 
+            DO NOTHING;
         `;
         const result = await client.query(query, [user_id, product_id]);
 
