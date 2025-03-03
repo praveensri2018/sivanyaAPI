@@ -266,6 +266,28 @@ app.get('/products/:id', async (req, res) => {
     }
 });
 
+app.post('/favorites', async (req, res) => {
+    const { user_id, product_id } = req.body;
+
+    if (!user_id || !product_id) {
+        return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    try {
+        const query = `
+            INSERT INTO public.Favorites (user_id, product_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, product_id) DO NOTHING
+            RETURNING *;
+        `;
+        const result = await client.query(query, [user_id, product_id]);
+
+        res.status(201).json({ message: "Added to favorites successfully", favorite: result.rows[0] });
+    } catch (error) {
+        console.error("Error adding to favorites:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
 
 // New Database sivanyaApk End
 
