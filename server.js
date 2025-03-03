@@ -314,6 +314,33 @@ app.post('/cart', async (req, res) => {
     }
 });
 
+app.get('/favorites/:user_id', async (req, res) => {
+    const { user_id } = req.params;
+
+    if (!user_id) {
+        return res.status(400).json({ message: "User ID is required" });
+    }
+
+    try {
+        const query = `
+            SELECT f.favorite_id,  p.product_id,  p.name AS product_name,  img.image_url,  pp.size,  pp.price
+            FROM public.Favorites f
+            JOIN public.Products p ON f.product_id = p.product_id
+            LEFT JOIN public.Users u ON f.user_id = u.user_id  -- Add this join to get user_type
+            LEFT JOIN public.ProductImages img ON p.product_id = img.product_id
+            LEFT JOIN public.ProductPricing pp ON p.product_id = pp.product_id AND pp.user_type = u.user_type -- Now it works
+            WHERE f.user_id = $1
+            ORDER BY f.created_at DESC;
+        `;
+        const result = await client.query(query, [user_id]);
+
+        res.status(200).json({ favorites: result.rows });
+    } catch (error) {
+        console.error("Error fetching favorites:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 // New Database sivanyaApk End
 
 // Start server
