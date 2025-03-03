@@ -298,13 +298,13 @@ app.post('/cart', async (req, res) => {
     }
 
     try {
-        const query = 
+        const query = `
             INSERT INTO public.Cart (user_id, product_id, size, quantity)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (user_id, product_id, size)
             DO UPDATE SET quantity = Cart.quantity + EXCLUDED.quantity
             RETURNING *;
-        ;
+        `;
         const result = await client.query(query, [user_id, product_id, size, quantity]);
 
         res.status(201).json({ message: "Added to cart successfully", cart: result.rows[0] });
