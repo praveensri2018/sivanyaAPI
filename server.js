@@ -267,6 +267,57 @@ app.get('/products/:id', async (req, res) => {
 });
 
 
+// Add to Cart API
+app.post('/cart', async (req, res) => {
+    const { user_id, product_id, size, quantity } = req.body;
+
+    if (!user_id || !product_id || !size || !quantity) {
+        return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    try {
+        const query = `
+            INSERT INTO public.Cart (user_id, product_id, size, quantity)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, product_id, size)
+            DO UPDATE SET quantity = Cart.quantity + $4
+            RETURNING *;
+        `;
+        const result = await client.query(query, [user_id, product_id, size, quantity]);
+
+        res.status(201).json({ message: "Added to cart successfully", cart: result.rows[0] });
+    } catch (error) {
+        console.error("Error adding to cart:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// Add to Favorites API
+app.post('/favorites', async (req, res) => {
+    const { user_id, product_id } = req.body;
+
+    if (!user_id || !product_id) {
+        return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    try {
+        const query = `
+            INSERT INTO public.Favorites (user_id, product_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, product_id) DO NOTHING
+            RETURNING *;
+        `;
+        const result = await client.query(query, [user_id, product_id]);
+
+        res.status(201).json({ message: "Added to favorites successfully", favorite: result.rows[0] });
+    } catch (error) {
+        console.error("Error adding to favorites:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+
+
 // New Database sivanyaApk End
 
 // Start server
