@@ -289,6 +289,31 @@ app.post('/favorites', async (req, res) => {
     }
 });
 
+
+app.post('/cart', async (req, res) => {
+    const { user_id, product_id, size, quantity } = req.body;
+
+    if (!user_id || !product_id || !size || !quantity) {
+        return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    try {
+        const query = 
+            INSERT INTO public.Cart (user_id, product_id, size, quantity)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, product_id, size)
+            DO UPDATE SET quantity = Cart.quantity + EXCLUDED.quantity
+            RETURNING *;
+        ;
+        const result = await client.query(query, [user_id, product_id, size, quantity]);
+
+        res.status(201).json({ message: "Added to cart successfully", cart: result.rows[0] });
+    } catch (error) {
+        console.error("Error adding to cart:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 // New Database sivanyaApk End
 
 // Start server
