@@ -1,0 +1,106 @@
+const express = require('express');
+const { Client } = require('pg');
+
+const router = express.Router();
+const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+client.connect();
+
+// **Send a Message**
+router.post('/chat', async (req, res) => {
+    const { sender_id, receiver_id, message } = req.body;
+
+    if (!sender_id || !receiver_id || !message.trim()) {
+        return res.status(400).json({ message: "Sender, receiver, and message are required" });
+    }
+
+    try {
+        const query = `
+            INSERT INTO public.SupportChat (sender_id, receiver_id, message) 
+            VALUES ($1, $2, $3) RETURNING *;
+        `;
+        const result = await client.query(query, [sender_id, receiver_id, message]);
+
+        res.status(201).json({ message: "Message sent", chat: result.rows[0] });
+
+    } catch (error) {
+        console.error("Error sending message:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// **Get Chat Messages for a User (All Messages Sent or Received)**
+router.get('/chat/:user_id', async (req, res) => {
+    const { user_id } = req.params;
+
+    try {
+        const query = `
+            SELECT * FROM public.SupportChat 
+            WHERE sender_id = $1 OR receiver_id = $1 
+            ORDER BY sent_at ASC;
+        `;
+        const result = await client.query(query, [user_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No messages found for this user" });
+        }
+
+        res.status(200).json({ chats: result.rows });
+
+    } catch (error) {
+        console.error("Error retrieving messages:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// **Get Chat Conversations (List of Users Chatting with the Given User)**
+router.get('/chat/conversations/:user_id', async (req, res) => {
+    const { user_id } = req.params;
+
+    try {
+        const query = `
+            SELECT DISTINCT u.user_id, u.name, u.email 
+            FROM public.Users u 
+            JOIN public.SupportChat sc 
+            ON u.user_id = sc.sender_id OR u.user_id = sc.receiver_id
+            WHERE u.user_id != $1 AND (sc.sender_id = $1 OR sc.receiver_id = $1);
+        `;
+        const result = await client.query(query, [user_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No conversations found for this user" });
+        }
+
+        res.status(200).json({ conversations: result.rows });
+
+    } catch (error) {
+        console.error("Error retrieving conversations:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// **Delete a Chat Message**
+router.delete('/chat/:chat_id', async (req, res) => {
+    const { chat_id } = req.params;
+
+    try {
+        // **Check if the Message Exists**
+        const checkQuery = 'SELECT * FROM public.SupportChat WHERE chat_id = $1';
+        const checkResult = await client.query(checkQuery, [chat_id]);
+
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ message: "Chat message not found" });
+        }
+
+        // **Delete the Message**
+        const deleteQuery = 'DELETE FROM public.SupportChat WHERE chat_id = $1 RETURNING *';
+        const result = await client.query(deleteQuery, [chat_id]);
+
+        res.status(200).json({ message: "Chat message deleted", deletedChat: result.rows[0] });
+
+    } catch (error) {
+        console.error("Error deleting chat message:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+module.exports = router;
