@@ -6,7 +6,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { r
 client.connect();
 
 // **Add stock for a product**
-router.post('/product-stock', async (req, res) => {
+router.post('/', async (req, res) => {
     const { product_id, size, quantity, stock_type } = req.body;
 
     if (!product_id || !size || !quantity || !stock_type) {
@@ -29,7 +29,7 @@ router.post('/product-stock', async (req, res) => {
 });
 
 // **Get stock details for a product**
-router.get('/product-stock/:product_id', async (req, res) => {
+router.get('/:product_id', async (req, res) => {
     const { product_id } = req.params;
 
     try {
@@ -49,7 +49,7 @@ router.get('/product-stock/:product_id', async (req, res) => {
 });
 
 // **Update stock quantity**
-router.put('/product-stock/:stock_id', async (req, res) => {
+router.put('/:stock_id', async (req, res) => {
     const { stock_id } = req.params;
     const { quantity } = req.body;
 
@@ -76,7 +76,7 @@ router.put('/product-stock/:stock_id', async (req, res) => {
 });
 
 // **Remove stock entry**
-router.delete('/product-stock/:stock_id', async (req, res) => {
+router.delete('/:stock_id', async (req, res) => {
     const { stock_id } = req.params;
 
     try {

@@ -44,7 +44,18 @@ router.post('/', async (req, res) => {
 // **Upload product images**
 router.post('/:productId/images', async (req, res) => {
     const { productId } = req.params;
-    const files = req.files.images;
+
+    // Validate request
+    if (!req.files || !req.files.images) {
+        return res.status(400).json({ error: 'No images uploaded' });
+    }
+
+    let files = req.files.images;
+
+    // If only one file is uploaded, make it an array
+    if (!Array.isArray(files)) {
+        files = [files]; 
+    }
 
     try {
         for (const file of files) {
@@ -57,10 +68,11 @@ router.post('/:productId/images', async (req, res) => {
 
         res.status(201).json({ message: 'Images uploaded successfully' });
     } catch (error) {
-        console.error(error);
+        console.error('❌ Error uploading images:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 
 // **Get all products**
 router.get('/', async (req, res) => {

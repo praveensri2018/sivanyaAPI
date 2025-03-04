@@ -36,7 +36,8 @@ const ordersRoutes = require('./routes/orders');
 const paymentsRoutes = require('./routes/payments');
 const supportRoutes = require('./routes/support');
 const productstockRoutes = require('./routes/productstock');
-const productpricingkRoutes = require('./routes/productpricing');
+const productpricingRoutes = require('./routes/productpricing');
+const pricingRoutes = require('./routes/pricing');
 
 
 app.use('/auth', authRoutes);
@@ -47,8 +48,8 @@ app.use('/orders', ordersRoutes);
 app.use('/payments', paymentsRoutes);
 app.use('/support', supportRoutes);
 app.use('/product-stock', productstockRoutes);
-app.use('/product-pricing', productpricingkRoutes);
-
+app.use('/productpricing', productpricingRoutes);
+app.use('/pricing', pricingRoutes);
 
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);

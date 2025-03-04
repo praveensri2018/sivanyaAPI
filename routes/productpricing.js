@@ -1,31 +1,47 @@
 const express = require('express');
+const { Client } = require('pg'); // Import Client from pg
 const router = express.Router();
 
-// **Add pricing for a product**
-router.post('/product-pricing', async (req, res) => {
-    const { product_id, size, user_type, price } = req.body;
+const client = new Client({ 
+    connectionString: process.env.DATABASE_URL, 
+    ssl: { rejectUnauthorized: false } 
+});
+client.connect();
 
+// **Add or update pricing for a product**
+router.post('/', async (req, res) => {
+    const { product_id, size, user_type, price } = req.body;
+    
+    console.log("Received request:", req.body); // Debugging
+    
     if (!product_id || !size || !user_type || !price) {
         return res.status(400).json({ message: "All fields (product_id, size, user_type, price) are required" });
     }
 
     try {
         const query = `
-            INSERT INTO public.ProductPricing (product_id, size, user_type, price)
-            VALUES ($1, $2, $3, $4) RETURNING *;
+            INSERT INTO public.ProductPricing (product_id, size, user_type, price) 
+            VALUES ($1, $2, $3, $4) 
+            ON CONFLICT (product_id, size, user_type) 
+            DO UPDATE SET price = EXCLUDED.price 
+            RETURNING *;
         `;
+        
+        console.log("Running query:", query); // Debugging
+
         const result = await client.query(query, [product_id, size, user_type, price]);
 
-        res.status(201).json({ message: "Pricing added successfully", pricing: result.rows[0] });
-
+        console.log("Query result:", result.rows); // Debugging
+        
+        res.status(201).json({ message: "Pricing added/updated successfully", pricing: result.rows[0] });
     } catch (error) {
-        console.error("Error adding pricing:", error);
+        console.error("Error adding/updating pricing:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 });
 
 // **Get pricing details for a product**
-router.get('/product-pricing/:product_id', async (req, res) => {
+router.get('/:product_id', async (req, res) => {
     const { product_id } = req.params;
 
     try {
@@ -45,7 +61,7 @@ router.get('/product-pricing/:product_id', async (req, res) => {
 });
 
 // **Update product pricing**
-router.put('/product-pricing/:price_id', async (req, res) => {
+router.put('/:price_id', async (req, res) => {
     const { price_id } = req.params;
     const { price } = req.body;
 
@@ -72,7 +88,7 @@ router.put('/product-pricing/:price_id', async (req, res) => {
 });
 
 // **Remove pricing entry**
-router.delete('/product-pricing/:price_id', async (req, res) => {
+router.delete('/:price_id', async (req, res) => {
     const { price_id } = req.params;
 
     try {

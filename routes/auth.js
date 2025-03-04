@@ -56,8 +56,14 @@ router.post('/register', async (req, res) => {
     try {
         const existingUser = await client.query('SELECT * FROM public.Users WHERE email = $1', [email]);
 
+        const existingUserPhone = await client.query('SELECT * FROM public.Users WHERE phone = $1', [phone]);
+
         if (existingUser.rows.length > 0) {
             return res.status(400).json({ error: 'Email already exists' });
+        }
+
+        if (existingUserPhone.rows.length > 0) {
+            return res.status(400).json({ error: 'Phone already exists' });
         }
 
         const saltRounds = 10;
@@ -143,6 +149,63 @@ router.delete('/user/:id', async (req, res) => {
 });
 
 
+router.put('/change-password', async (req, res) => {
+    const { user_id, old_password, new_password } = req.body;
+
+    if (!user_id || !old_password || !new_password) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    try {
+        const userQuery = 'SELECT password_hash FROM public.Users WHERE user_id = $1';
+        const userResult = await client.query(userQuery, [user_id]);
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const isMatch = await bcrypt.compare(old_password, userResult.rows[0].password_hash);
+
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Old password is incorrect' });
+        }
+
+        const hashedPassword = await bcrypt.hash(new_password, 10);
+        const updateQuery = 'UPDATE public.Users SET password_hash = $1 WHERE user_id = $2';
+        await client.query(updateQuery, [hashedPassword, user_id]);
+
+        res.status(200).json({ message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('Error changing password:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/forgot-password', async (req, res) => {
+    const { phone } = req.body;
+
+    if (!phone) {
+        return res.status(400).json({ error: 'Phone is required' });
+    }
+
+    try {
+        const userQuery = 'SELECT user_id FROM public.Users WHERE phone = $1';
+        const { rows } = await client.query(userQuery, [phone]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Generate a reset token (for simplicity, using user_id here)
+        const resetToken = `reset-${rows[0].user_id}`;
+
+        // Normally, you'd send this token via email
+        res.status(200).json({ message: 'Password reset link sent', token: resetToken });
+    } catch (error) {
+        console.error('Error in forgot password:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 
 module.exports = router;

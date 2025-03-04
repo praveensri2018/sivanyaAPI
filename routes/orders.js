@@ -6,7 +6,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { r
 client.connect();
 
 // **Place an Order**
-router.post('/orders', async (req, res) => {
+router.post('/', async (req, res) => {
     const { user_id } = req.body;
 
     if (!user_id) {
@@ -46,6 +46,14 @@ router.post('/orders', async (req, res) => {
         const orderDetailsValues = [order_id, ...cartResult.rows.flatMap(item => [item.product_id, item.size, item.quantity, item.price])];
         await client.query(orderDetailsQuery, orderDetailsValues);
 
+        // **Insert Stock as 'OUT'**
+        const stockQuery = `
+            INSERT INTO public.ProductStock (product_id, size, quantity, stock_type)
+            VALUES ${cartResult.rows.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, 'OUT')`).join(", ")}
+        `;
+        const stockValues = cartResult.rows.flatMap(item => [item.product_id, item.size, item.quantity]);
+        await client.query(stockQuery, stockValues);
+
         // **Clear User's Cart**
         await client.query('DELETE FROM public.Cart WHERE user_id = $1', [user_id]);
 
@@ -58,7 +66,7 @@ router.post('/orders', async (req, res) => {
 });
 
 // **Get User's Orders**
-router.get('/orders/:user_id', async (req, res) => {
+router.get('/:user_id', async (req, res) => {
     const { user_id } = req.params;
 
     try {
@@ -77,7 +85,7 @@ router.get('/orders/:user_id', async (req, res) => {
 });
 
 // **Get Order Details**
-router.get('/orders/details/:order_id', async (req, res) => {
+router.get('/details/:order_id', async (req, res) => {
     const { order_id } = req.params;
 
     try {
@@ -98,7 +106,7 @@ router.get('/orders/details/:order_id', async (req, res) => {
 });
 
 // **Update Order Status**
-router.put('/orders/:order_id', async (req, res) => {
+router.put('/:order_id', async (req, res) => {
     const { order_id } = req.params;
     const { order_status } = req.body;
 
@@ -123,8 +131,8 @@ router.put('/orders/:order_id', async (req, res) => {
     }
 });
 
-// **Cancel Order**
-router.delete('/orders/:order_id', async (req, res) => {
+// **Cancel Order (Update Order Status to "Cancelled")**
+router.delete('/:order_id', async (req, res) => {
     const { order_id } = req.params;
 
     try {
@@ -140,9 +148,9 @@ router.delete('/orders/:order_id', async (req, res) => {
             return res.status(400).json({ message: "Only pending orders can be cancelled" });
         }
 
-        // **Delete Order and Order Details**
-        await client.query('DELETE FROM public.OrderDetails WHERE order_id = $1', [order_id]);
-        const result = await client.query('DELETE FROM public.Orders WHERE order_id = $1 RETURNING *', [order_id]);
+        // **Update Order Status to "Cancelled"**
+        const updateQuery = `UPDATE public.Orders SET order_status = 'Cancelled' WHERE order_id = $1 RETURNING *;`;
+        const result = await client.query(updateQuery, [order_id]);
 
         res.status(200).json({ message: "Order cancelled successfully", order: result.rows[0] });
 

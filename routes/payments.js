@@ -6,7 +6,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { r
 client.connect();
 
 // **Process Payment**
-router.post('/payments', async (req, res) => {
+router.post('/', async (req, res) => {
     const { order_id, user_id, amount, payment_method, payment_reference } = req.body;
 
     if (!order_id || !user_id || !amount || !payment_method || !payment_reference) {
@@ -42,7 +42,7 @@ router.post('/payments', async (req, res) => {
 });
 
 // **Get Payment Details for an Order**
-router.get('/payments/:order_id', async (req, res) => {
+router.get('/:order_id', async (req, res) => {
     const { order_id } = req.params;
 
     try {
@@ -64,7 +64,7 @@ router.get('/payments/:order_id', async (req, res) => {
 });
 
 // **Get All Payments for a User**
-router.get('/payments/user/:user_id', async (req, res) => {
+router.get('/user/:user_id', async (req, res) => {
     const { user_id } = req.params;
 
     try {
@@ -86,7 +86,7 @@ router.get('/payments/user/:user_id', async (req, res) => {
 });
 
 // **Update Payment Status**
-router.put('/payments/:payment_id', async (req, res) => {
+router.put('/:payment_id', async (req, res) => {
     const { payment_id } = req.params;
     const { status } = req.body;
 
@@ -122,8 +122,8 @@ router.put('/payments/:payment_id', async (req, res) => {
     }
 });
 
-// **Delete a Payment Record**
-router.delete('/payments/:payment_id', async (req, res) => {
+// **Refund a Payment**
+router.put('/:payment_id/refund', async (req, res) => {
     const { payment_id } = req.params;
 
     try {
@@ -135,14 +135,25 @@ router.delete('/payments/:payment_id', async (req, res) => {
             return res.status(404).json({ message: "Payment not found" });
         }
 
-        // **Delete Payment**
-        const query = 'DELETE FROM public.Payments WHERE payment_id = $1 RETURNING *';
-        const result = await client.query(query, [payment_id]);
+        if (checkResult.rows[0].status === 'Refunded') {
+            return res.status(400).json({ message: "Payment is already refunded" });
+        }
 
-        res.status(200).json({ message: "Payment deleted successfully", payment: result.rows[0] });
+        // **Update Payment Status to "Refunded"**
+        const updateQuery = 'UPDATE public.Payments SET status = $1 WHERE payment_id = $2 RETURNING *';
+        const result = await client.query(updateQuery, ['Refunded', payment_id]);
+
+        // **Update Order Payment Status if Needed**
+        await client.query(`
+            UPDATE public.Orders SET payment_status = 'Refunded' WHERE order_id = (
+                SELECT order_id FROM public.Payments WHERE payment_id = $1
+            );
+        `, [payment_id]);
+
+        res.status(200).json({ message: "Payment marked as Refunded", payment: result.rows[0] });
 
     } catch (error) {
-        console.error("Error deleting payment:", error);
+        console.error("Error refunding payment:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 });

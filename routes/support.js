@@ -6,7 +6,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { r
 client.connect();
 
 // **Send a Message**
-router.post('/support/chat', async (req, res) => {
+router.post('/chat', async (req, res) => {
     const { sender_id, receiver_id, message } = req.body;
 
     if (!sender_id || !receiver_id || !message.trim()) {
@@ -29,7 +29,7 @@ router.post('/support/chat', async (req, res) => {
 });
 
 // **Get Chat Messages for a User (All Messages Sent or Received)**
-router.get('/support/chat/:user_id', async (req, res) => {
+router.get('/chat/:user_id', async (req, res) => {
     const { user_id } = req.params;
 
     try {
@@ -53,7 +53,7 @@ router.get('/support/chat/:user_id', async (req, res) => {
 });
 
 // **Get Chat Conversations (List of Users Chatting with the Given User)**
-router.get('/support/chat/conversations/:user_id', async (req, res) => {
+router.get('/chat/conversations/:user_id', async (req, res) => {
     const { user_id } = req.params;
 
     try {
@@ -79,7 +79,7 @@ router.get('/support/chat/conversations/:user_id', async (req, res) => {
 });
 
 // **Delete a Chat Message**
-router.delete('/support/chat/:chat_id', async (req, res) => {
+router.delete('/chat/:chat_id', async (req, res) => {
     const { chat_id } = req.params;
 
     try {
