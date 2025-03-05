@@ -75,7 +75,7 @@ router.post('/:productId/images', async (req, res) => {
 
 
 // **Get all products**
-router.get('/', async (req, res) => {
+router.get('/all', async (req, res) => {
     try {
         const query = `
             SELECT p.product_id, p.name, p.category_id, p.description, 
