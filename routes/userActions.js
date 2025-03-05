@@ -136,7 +136,7 @@ router.get('/cart/:user_id', async (req, res) => {
                 LEFT JOIN public.ProductImages img ON p.product_id = img.product_id
                 LEFT JOIN public.ProductPricing pp ON c.product_id = pp.product_id AND pp.size = c.size
                 LEFT JOIN public.Users utb ON utb.user_id = c.user_id
-                WHERE c.user_id = 4 AND utb.user_type = pp.user_type
+                WHERE c.user_id = $1 AND utb.user_type = pp.user_type
                 GROUP BY c.cart_id, c.product_id, c.size, c.quantity, p.name, pp.price
                 ORDER BY c.cart_id DESC;
         `;
