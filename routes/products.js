@@ -158,26 +158,41 @@ router.delete('/:id', async (req, res) => {
 
 // **Get products with pagination (Lazy Loading)**
 router.get('/', async (req, res) => {
-    let { page = 1, limit = 10 } = req.query;
+    let { page = 1, limit = 10, search = '', category_id, size, user_type, sortBy = 'created_at', order = 'desc' } = req.query;
     page = parseInt(page);
     limit = parseInt(limit);
     const offset = (page - 1) * limit;
+    
+    const validSortColumns = ['name', 'created_at', 'price'];
+    if (!validSortColumns.includes(sortBy)) sortBy = 'created_at';
+    if (!['asc', 'desc'].includes(order.toLowerCase())) order = 'desc';
 
     try {
-        const query = `
+        let query = `
             SELECT p.product_id, p.name, p.category_id, p.description, 
                 (SELECT json_agg(pi.image_url) FROM public.ProductImages pi WHERE pi.product_id = p.product_id) AS images,
                 (SELECT json_agg(json_build_object('size', ps.size, 'quantity', ps.quantity)) 
-                 FROM public.ProductStock ps WHERE ps.product_id = p.product_id) AS stock
+                 FROM public.ProductStock ps WHERE ps.product_id = p.product_id) AS stock,
+                (SELECT price FROM public.ProductPricing pp WHERE pp.product_id = p.product_id 
+                 AND ($3::TEXT IS NULL OR pp.user_type = $3) 
+                 AND ($4::TEXT IS NULL OR pp.size = $4)
+                 ORDER BY pp.price ${order} LIMIT 1) AS price
             FROM public.Products p
-            ORDER BY p.created_at DESC
-            LIMIT $1 OFFSET $2;
+            WHERE ($1::TEXT IS NULL OR LOWER(p.name) LIKE LOWER($1) OR LOWER(p.description) LIKE LOWER($1))
+                AND ($2::INT IS NULL OR p.category_id = $2)
+            ORDER BY ${sortBy} ${order}
+            LIMIT $5 OFFSET $6;
         `;
-        const productsResult = await client.query(query, [limit, offset]);
+
+        const productsResult = await client.query(query, [search ? `%${search}%` : null, category_id || null, user_type || null, size || null, limit, offset]);
 
         // Get total product count
-        const countQuery = `SELECT COUNT(*) FROM public.Products;`;
-        const countResult = await client.query(countQuery);
+        const countQuery = `
+            SELECT COUNT(*) FROM public.Products 
+            WHERE ($1::TEXT IS NULL OR LOWER(name) LIKE LOWER($1) OR LOWER(description) LIKE LOWER($1))
+                AND ($2::INT IS NULL OR category_id = $2);
+        `;
+        const countResult = await client.query(countQuery, [search ? `%${search}%` : null, category_id || null]);
         const totalProducts = parseInt(countResult.rows[0].count);
 
         res.json({
@@ -191,6 +206,7 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
 
 
 module.exports = router;
