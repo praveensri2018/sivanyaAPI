@@ -7,10 +7,14 @@ client.connect();
 
 // **Place an Order**
 router.post('/', async (req, res) => {
-    const { user_id } = req.body;
+    const { user_id, shipping_address } = req.body;  // Get shipping address from request body
 
     if (!user_id) {
         return res.status(400).json({ message: "User ID is required" });
+    }
+
+    if (!shipping_address || typeof shipping_address !== 'object') {
+        return res.status(400).json({ message: "Valid shipping address is required" });
     }
 
     try {
@@ -31,11 +35,12 @@ router.post('/', async (req, res) => {
         // **Calculate Total Amount**
         const totalAmount = cartResult.rows.reduce((sum, item) => sum + (item.quantity * item.price), 0);
 
-        // **Create Order**
+        // **Create Order with Shipping Address**
         const orderQuery = `
-            INSERT INTO public.Orders (user_id, total_amount) VALUES ($1, $2) RETURNING *;
+            INSERT INTO public.Orders (user_id, total_amount, shipping_address) 
+            VALUES ($1, $2, $3) RETURNING *;
         `;
-        const orderResult = await client.query(orderQuery, [user_id, totalAmount]);
+        const orderResult = await client.query(orderQuery, [user_id, totalAmount, shipping_address]);
         const order_id = orderResult.rows[0].order_id;
 
         // **Insert Order Details**
@@ -71,7 +76,7 @@ router.get('/:user_id', async (req, res) => {
 
     try {
         const query = `
-            SELECT order_id, total_amount, order_status, payment_status, created_at
+            SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address
             FROM public.Orders
             WHERE user_id = $1
             ORDER BY created_at DESC;
@@ -92,9 +97,11 @@ router.get('/details/:order_id', async (req, res) => {
         const query = `
             SELECT 
                 od.order_id, od.product_id, p.name AS product_name, od.size, 
-                od.quantity, od.price, (od.quantity * od.price) AS total_price
+                od.quantity, od.price, (od.quantity * od.price) AS total_price,
+                o.shipping_address
             FROM public.OrderDetails od
             JOIN public.Products p ON od.product_id = p.product_id
+            JOIN public.Orders o ON od.order_id = o.order_id
             WHERE od.order_id = $1;
         `;
         const result = await client.query(query, [order_id]);
@@ -104,6 +111,7 @@ router.get('/details/:order_id', async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 });
+
 
 // **Update Order Status**
 router.put('/:order_id', async (req, res) => {
