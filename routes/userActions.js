@@ -128,21 +128,17 @@ router.get('/cart/:user_id', async (req, res) => {
 
     try {
         const query = `
-            SELECT 
-                c.cart_id,
-                c.product_id,
-                c.size,
-                c.quantity,
-                p.name AS product_name,
-                COALESCE(json_agg(DISTINCT img.image_url) FILTER (WHERE img.image_url IS NOT NULL), '[]') AS images,
-                pp.price
-            FROM public.Cart c
-            JOIN public.Products p ON c.product_id = p.product_id
-            LEFT JOIN public.ProductImages img ON p.product_id = img.product_id
-            LEFT JOIN public.ProductPricing pp ON c.product_id = pp.product_id AND pp.size = c.size
-            WHERE c.user_id = $1
-            GROUP BY c.cart_id, p.product_id, p.name, pp.price
-            ORDER BY c.cart_id DESC;
+                SELECT c.cart_id, c.product_id, c.size, c.quantity, p.name AS product_name,
+                    COALESCE(json_agg(DISTINCT img.image_url) FILTER (WHERE img.image_url IS NOT NULL), '[]') AS images,
+                    pp.price
+                FROM public.Cart c
+                JOIN public.Products p ON c.product_id = p.product_id
+                LEFT JOIN public.ProductImages img ON p.product_id = img.product_id
+                LEFT JOIN public.ProductPricing pp ON c.product_id = pp.product_id AND pp.size = c.size
+                LEFT JOIN public.Users utb ON utb.user_id = c.user_id
+                WHERE c.user_id = 4 AND utb.user_type = pp.user_type
+                GROUP BY c.cart_id, c.product_id, c.size, c.quantity, p.name, pp.price
+                ORDER BY c.cart_id DESC;
         `;
 
         const result = await client.query(query, [user_id]);
