@@ -5,7 +5,7 @@ const router = express.Router();
 const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 client.connect();
 
-// **Send a Message**
+// **Send a Message & Track Status**
 router.post('/chat', async (req, res) => {
     const { sender_id, receiver_id, message } = req.body;
 
@@ -14,13 +14,22 @@ router.post('/chat', async (req, res) => {
     }
 
     try {
-        const query = `
+        // **Insert the Message into SupportChat**
+        const chatQuery = `
             INSERT INTO public.SupportChat (sender_id, receiver_id, message) 
             VALUES ($1, $2, $3) RETURNING *;
         `;
-        const result = await client.query(query, [sender_id, receiver_id, message]);
+        const chatResult = await client.query(chatQuery, [sender_id, receiver_id, message]);
+        const chat_id = chatResult.rows[0].chat_id;
 
-        res.status(201).json({ message: "Message sent", chat: result.rows[0] });
+        // **Insert Initial Status ("sent") into MessageStatus**
+        const statusQuery = `
+            INSERT INTO public.MessageStatus (chat_id, status) 
+            VALUES ($1, 'sent') RETURNING *;
+        `;
+        await client.query(statusQuery, [chat_id]);
+
+        res.status(201).json({ message: "Message sent", chat: chatResult.rows[0] });
 
     } catch (error) {
         console.error("Error sending message:", error);
@@ -28,15 +37,23 @@ router.post('/chat', async (req, res) => {
     }
 });
 
-// **Get Chat Messages for a User (All Messages Sent or Received)**
+// **Get Chat Messages with Latest Status**
 router.get('/chat/:user_id', async (req, res) => {
     const { user_id } = req.params;
 
     try {
         const query = `
-            SELECT * FROM public.SupportChat 
-            WHERE sender_id = $1 OR receiver_id = $1 
-            ORDER BY sent_at ASC;
+            SELECT sc.*, ms.status, ms.updated_at 
+            FROM public.SupportChat sc
+            LEFT JOIN LATERAL (
+                SELECT status, updated_at
+                FROM public.MessageStatus ms
+                WHERE ms.chat_id = sc.chat_id
+                ORDER BY ms.updated_at DESC
+                LIMIT 1
+            ) ms ON true
+            WHERE sc.sender_id = $1 OR sc.receiver_id = $1 
+            ORDER BY sc.sent_at ASC;
         `;
         const result = await client.query(query, [user_id]);
 
@@ -48,6 +65,53 @@ router.get('/chat/:user_id', async (req, res) => {
 
     } catch (error) {
         console.error("Error retrieving messages:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+
+// **Update Message Status (delivered/read)**
+router.post('/chat/status', async (req, res) => {
+    const { chat_id, status } = req.body;
+
+    if (!chat_id || !['delivered', 'read'].includes(status)) {
+        return res.status(400).json({ message: "Invalid chat_id or status" });
+    }
+
+    try {
+        const query = `
+            INSERT INTO public.MessageStatus (chat_id, status) 
+            VALUES ($1, $2) RETURNING *;
+        `;
+        const result = await client.query(query, [chat_id, status]);
+
+        res.status(200).json({ message: `Message marked as ${status}`, status: result.rows[0] });
+
+    } catch (error) {
+        console.error("Error updating status:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// **Get Message Status History**
+router.get('/chat/status/:chat_id', async (req, res) => {
+    const { chat_id } = req.params;
+
+    try {
+        const query = `
+            SELECT * FROM public.MessageStatus 
+            WHERE chat_id = $1 ORDER BY updated_at ASC;
+        `;
+        const result = await client.query(query, [chat_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No status history found for this message" });
+        }
+
+        res.status(200).json({ status_history: result.rows });
+
+    } catch (error) {
+        console.error("Error retrieving status history:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 });
