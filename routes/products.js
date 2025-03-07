@@ -6,6 +6,43 @@ const router = express.Router();
 const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 client.connect();
 
+
+router.post('/:productId/update-images', async (req, res) => {
+    const { productId } = req.params;
+    const removedImages = req.body.removedImages ? req.body.removedImages.split(',') : [];
+
+    let files = req.files?.images || [];
+    if (!Array.isArray(files)) {
+        files = [files]; 
+    }
+
+    try {
+        // Step 1: Delete only the removed images from Cloudinary and database
+        if (removedImages.length > 0) {
+            for (const imageUrl of removedImages) {
+                const publicId = imageUrl.split('/').pop().split('.')[0]; // Extract public ID
+                await cloudinary.uploader.destroy(publicId);
+                await client.query('DELETE FROM public.ProductImages WHERE product_id = $1 AND image_url = $2', [productId, imageUrl]);
+            }
+        }
+
+        // Step 2: Upload new images
+        for (const file of files) {
+            const result = await cloudinary.uploader.upload(file.tempFilePath);
+            await client.query(
+                'INSERT INTO public.ProductImages (product_id, image_url) VALUES ($1, $2)',
+                [productId, result.secure_url]
+            );
+        }
+
+        res.status(201).json({ message: 'Images updated successfully' });
+    } catch (error) {
+        console.error('❌ Error updating images:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
 // **Add a new product**
 router.post('/', async (req, res) => {
     const { name, category_id, description, sizes, prices } = req.body;
