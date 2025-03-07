@@ -253,6 +253,7 @@ router.post('/admin/products/:id/stock', async (req, res) => {
 
 router.get('/admin/products', async (req, res) => {
     let { page = 1, limit = 10, search = '', category_id, sortBy = 'created_at', order = 'desc' } = req.query;
+    
     page = parseInt(page);
     limit = parseInt(limit);
     const offset = (page - 1) * limit;
@@ -262,14 +263,14 @@ router.get('/admin/products', async (req, res) => {
     if (!['asc', 'desc'].includes(order.toLowerCase())) order = 'desc';
 
     try {
-        let query = `
+        const query = `
             SELECT p.product_id, p.name, p.category_id, p.description,
                 COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images,
-                COALESCE(json_agg(DISTINCT json_build_object(
+                COALESCE(json_agg(DISTINCT jsonb_build_object(
                     'size', ps.size,
                     'quantity', ps.quantity,
                     'stock_type', ps.stock_type
-                )) FILTER (WHERE ps.size IS NOT NULL), '[]') AS stock
+                )::jsonb) FILTER (WHERE ps.size IS NOT NULL), '[]')::json AS stock
             FROM public.Products p
             LEFT JOIN public.ProductImages pi ON p.product_id = pi.product_id
             LEFT JOIN public.ProductStock ps ON p.product_id = ps.product_id
@@ -280,7 +281,12 @@ router.get('/admin/products', async (req, res) => {
             LIMIT $3 OFFSET $4;
         `;
 
-        const productsResult = await client.query(query, [search ? `%${search}%` : null, category_id || null, limit, offset]);
+        const productsResult = await client.query(query, [
+            search ? `%${search}%` : null, 
+            category_id || null, 
+            limit, 
+            offset
+        ]);
 
         // Get total product count
         const countQuery = `
@@ -288,7 +294,11 @@ router.get('/admin/products', async (req, res) => {
             WHERE ($1::TEXT IS NULL OR LOWER(name) LIKE LOWER($1) OR LOWER(description) LIKE LOWER($1))
                 AND ($2::INT IS NULL OR category_id = $2);
         `;
-        const countResult = await client.query(countQuery, [search ? `%${search}%` : null, category_id || null]);
+        const countResult = await client.query(countQuery, [
+            search ? `%${search}%` : null, 
+            category_id || null
+        ]);
+
         const totalProducts = parseInt(countResult.rows[0].count);
 
         res.json({
@@ -303,22 +313,23 @@ router.get('/admin/products', async (req, res) => {
     }
 });
 
+// 🔹 GET Single Product By ID (With Images, Stock, and Pricing)
 router.get('/admin/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const query = `
             SELECT p.product_id, p.name, p.category_id, p.description,
                 COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images,
-                COALESCE(json_agg(DISTINCT json_build_object(
+                COALESCE(json_agg(DISTINCT jsonb_build_object(
                     'size', ps.size,
                     'quantity', ps.quantity,
                     'stock_type', ps.stock_type
-                )) FILTER (WHERE ps.size IS NOT NULL), '[]') AS stock,
-                COALESCE(json_agg(DISTINCT json_build_object(
+                )::jsonb) FILTER (WHERE ps.size IS NOT NULL), '[]')::json AS stock,
+                COALESCE(json_agg(DISTINCT jsonb_build_object(
                     'size', pp.size,
                     'user_type', pp.user_type,
                     'price', pp.price
-                )) FILTER (WHERE pp.size IS NOT NULL), '[]') AS pricing
+                )::jsonb) FILTER (WHERE pp.size IS NOT NULL), '[]')::json AS pricing
             FROM public.Products p
             LEFT JOIN public.ProductImages pi ON p.product_id = pi.product_id
             LEFT JOIN public.ProductStock ps ON p.product_id = ps.product_id
@@ -339,6 +350,5 @@ router.get('/admin/products/:id', async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-
 
 module.exports = router;
