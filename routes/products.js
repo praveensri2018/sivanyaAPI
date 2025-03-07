@@ -283,12 +283,11 @@ router.post('/admin/products/:id/stock', async (req, res) => {
         for (let entry of stockEntries) {
             const { size, quantity, stock_type, retailer_price, customer_price } = entry;
 
-            // Insert or Update Stock
+            // Insert Stock
             await client.query(`
                 INSERT INTO public.ProductStock (product_id, size, quantity, stock_type)
                 VALUES ($1, $2, $3, $4)
-                ON CONFLICT (product_id, size) 
-                DO UPDATE SET quantity = EXCLUDED.quantity, stock_type = EXCLUDED.stock_type;
+                ;
             `, [id, size, quantity, stock_type]);
 
             // Insert or Update Retailer Price
