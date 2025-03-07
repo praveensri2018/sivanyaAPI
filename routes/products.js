@@ -362,4 +362,59 @@ router.get('/admin/products/:id', async (req, res) => {
     }
 });
 
+router.post('/add', async (req, res) => {
+    const { name, category_id, description } = req.body;
+
+    try {
+        const productResult = await client.query(
+            'INSERT INTO public.Products (name, category_id, description, activeflag) VALUES ($1, $2, $3, TRUE) RETURNING product_id',
+            [name, category_id, description]
+        );
+
+        res.status(201).json({ message: 'Product added successfully', productId: productResult.rows[0].product_id });
+    } catch (error) {
+        console.error('❌ Error adding product:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/addStock', async (req, res) => {
+    const { product_id, size, quantity } = req.body;
+
+    try {
+        await client.query(
+            'INSERT INTO public.ProductStock (product_id, size, quantity, stock_type) VALUES ($1, $2, $3, $4)',
+            [product_id, size, quantity, 'IN']
+        );
+
+        res.status(201).json({ message: 'Stock added successfully' });
+    } catch (error) {
+        console.error('❌ Error adding stock:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+router.post('/addPricing', async (req, res) => {
+    const { product_id, size, retailer_price, customer_price } = req.body;
+
+    try {
+        const query = `
+            INSERT INTO public.ProductPricing (product_id, size, user_type, price)
+            VALUES 
+                ($1, $2, 'Retailer', $3),
+                ($1, $2, 'Customer', $4)
+            ON CONFLICT (product_id, size, user_type) 
+            DO UPDATE SET price = EXCLUDED.price;
+        `;
+
+        await client.query(query, [product_id, size, retailer_price, customer_price]);
+
+        res.status(201).json({ message: 'Pricing added/updated successfully' });
+    } catch (error) {
+        console.error('❌ Error adding pricing:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;
