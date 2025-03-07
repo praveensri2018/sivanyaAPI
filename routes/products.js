@@ -207,6 +207,138 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.post('/admin/products/:id/stock', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { stockEntries } = req.body;
+
+        if (!Array.isArray(stockEntries) || stockEntries.length === 0) {
+            return res.status(400).json({ error: "Invalid stock data" });
+        }
+
+        for (let entry of stockEntries) {
+            const { size, quantity, stock_type, retailer_price, customer_price } = entry;
+
+            // Insert or Update Stock
+            await client.query(`
+                INSERT INTO public.ProductStock (product_id, size, quantity, stock_type)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (product_id, size) 
+                DO UPDATE SET quantity = EXCLUDED.quantity, stock_type = EXCLUDED.stock_type;
+            `, [id, size, quantity, stock_type]);
+
+            // Insert or Update Retailer Price
+            await client.query(`
+                INSERT INTO public.ProductPricing (product_id, size, user_type, price)
+                VALUES ($1, $2, 'Retailer', $3)
+                ON CONFLICT (product_id, size, user_type) 
+                DO UPDATE SET price = EXCLUDED.price;
+            `, [id, size, retailer_price]);
+
+            // Insert or Update Customer Price
+            await client.query(`
+                INSERT INTO public.ProductPricing (product_id, size, user_type, price)
+                VALUES ($1, $2, 'Customer', $3)
+                ON CONFLICT (product_id, size, user_type) 
+                DO UPDATE SET price = EXCLUDED.price;
+            `, [id, size, customer_price]);
+        }
+
+        res.json({ message: "Stock and pricing added successfully" });
+    } catch (error) {
+        console.error("❌ Error adding stock & pricing:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+router.get('/admin/products', async (req, res) => {
+    let { page = 1, limit = 10, search = '', category_id, sortBy = 'created_at', order = 'desc' } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const offset = (page - 1) * limit;
+
+    const validSortColumns = ['name', 'created_at'];
+    if (!validSortColumns.includes(sortBy)) sortBy = 'created_at';
+    if (!['asc', 'desc'].includes(order.toLowerCase())) order = 'desc';
+
+    try {
+        let query = `
+            SELECT p.product_id, p.name, p.category_id, p.description,
+                COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images,
+                COALESCE(json_agg(DISTINCT json_build_object(
+                    'size', ps.size,
+                    'quantity', ps.quantity,
+                    'stock_type', ps.stock_type
+                )) FILTER (WHERE ps.size IS NOT NULL), '[]') AS stock
+            FROM public.Products p
+            LEFT JOIN public.ProductImages pi ON p.product_id = pi.product_id
+            LEFT JOIN public.ProductStock ps ON p.product_id = ps.product_id
+            WHERE ($1::TEXT IS NULL OR LOWER(p.name) LIKE LOWER($1) OR LOWER(p.description) LIKE LOWER($1))
+                AND ($2::INT IS NULL OR p.category_id = $2)
+            GROUP BY p.product_id
+            ORDER BY ${sortBy} ${order}
+            LIMIT $3 OFFSET $4;
+        `;
+
+        const productsResult = await client.query(query, [search ? `%${search}%` : null, category_id || null, limit, offset]);
+
+        // Get total product count
+        const countQuery = `
+            SELECT COUNT(*) FROM public.Products 
+            WHERE ($1::TEXT IS NULL OR LOWER(name) LIKE LOWER($1) OR LOWER(description) LIKE LOWER($1))
+                AND ($2::INT IS NULL OR category_id = $2);
+        `;
+        const countResult = await client.query(countQuery, [search ? `%${search}%` : null, category_id || null]);
+        const totalProducts = parseInt(countResult.rows[0].count);
+
+        res.json({
+            totalProducts,
+            totalPages: Math.ceil(totalProducts / limit),
+            currentPage: page,
+            products: productsResult.rows
+        });
+    } catch (error) {
+        console.error("❌ Error fetching admin products:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+router.get('/admin/products/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT p.product_id, p.name, p.category_id, p.description,
+                COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images,
+                COALESCE(json_agg(DISTINCT json_build_object(
+                    'size', ps.size,
+                    'quantity', ps.quantity,
+                    'stock_type', ps.stock_type
+                )) FILTER (WHERE ps.size IS NOT NULL), '[]') AS stock,
+                COALESCE(json_agg(DISTINCT json_build_object(
+                    'size', pp.size,
+                    'user_type', pp.user_type,
+                    'price', pp.price
+                )) FILTER (WHERE pp.size IS NOT NULL), '[]') AS pricing
+            FROM public.Products p
+            LEFT JOIN public.ProductImages pi ON p.product_id = pi.product_id
+            LEFT JOIN public.ProductStock ps ON p.product_id = ps.product_id
+            LEFT JOIN public.ProductPricing pp ON p.product_id = pp.product_id
+            WHERE p.product_id = $1
+            GROUP BY p.product_id;
+        `;
+
+        const result = await client.query(query, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Product not found" });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error("❌ Error fetching admin product details:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 
 
 module.exports = router;
