@@ -89,6 +89,65 @@ router.get('/:user_id', async (req, res) => {
     }
 });
 
+router.get('/all', async (req, res) => {
+    // Extract query parameters from the request
+    const { order_id, order_status, payment_status, start_date, end_date } = req.query;
+
+    try {
+        // Base query to fetch all orders
+        let query = `
+            SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address
+            FROM public.Orders
+        `;
+
+        // Add filters based on query parameters
+        const conditions = [];
+        const values = [];
+
+        // Filter by order_id if provided
+        if (order_id) {
+            conditions.push(`order_id = $${values.length + 1}`);
+            values.push(order_id);
+        }
+
+        // Filter by order_status if provided
+        if (order_status) {
+            conditions.push(`order_status = $${values.length + 1}`);
+            values.push(order_status);
+        }
+
+        // Filter by payment_status if provided
+        if (payment_status) {
+            conditions.push(`payment_status = $${values.length + 1}`);
+            values.push(payment_status);
+        }
+
+        // Filter by date range (start_date and end_date)
+        if (start_date && end_date) {
+            conditions.push(`created_at BETWEEN $${values.length + 1} AND $${values.length + 2}`);
+            values.push(start_date);
+            values.push(end_date);
+        }
+
+        // If there are any conditions, append them to the query
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+
+        // Add ordering to the query
+        query += ' ORDER BY created_at DESC';
+
+        // Execute the query with dynamic values
+        const result = await client.query(query, values);
+        res.status(200).json({ orders: result.rows });
+
+    } catch (error) {
+        console.error("Error fetching orders:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+
 // **Get Order Details**
 router.get('/details/:order_id', async (req, res) => {
     const { order_id } = req.params;
