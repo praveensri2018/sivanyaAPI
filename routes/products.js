@@ -121,7 +121,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// **Delete product by ID**
+
+// **Soft Delete Product by Setting activeflag to FALSE**
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
@@ -136,21 +137,13 @@ router.delete('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Product not found' });
         }
 
-        // **Delete related data before deleting the product**
-        await client.query('DELETE FROM public.Cart WHERE product_id = $1', [id]);
-        await client.query('DELETE FROM public.Favorites WHERE product_id = $1', [id]);
-        await client.query('DELETE FROM public.OrderDetails WHERE product_id = $1', [id]);
-        await client.query('DELETE FROM public.ProductImages WHERE product_id = $1', [id]);
-        await client.query('DELETE FROM public.ProductStock WHERE product_id = $1', [id]);
-        await client.query('DELETE FROM public.ProductPricing WHERE product_id = $1', [id]);
+        // **Set activeflag to FALSE instead of deleting the product**
+        const softDeleteQuery = 'UPDATE public.Products SET activeflag = FALSE WHERE product_id = $1 RETURNING *';
+        const { rows } = await client.query(softDeleteQuery, [id]);
 
-        // **Delete product**
-        const deleteProductQuery = 'DELETE FROM public.Products WHERE product_id = $1 RETURNING *';
-        const { rows } = await client.query(deleteProductQuery, [id]);
-
-        res.status(200).json({ message: 'Product deleted successfully', product: rows[0] });
+        res.status(200).json({ message: 'Product deactivated successfully', product: rows[0] });
     } catch (error) {
-        console.error('❌ Error deleting product:', error);
+        console.error('❌ Error deactivating product:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
