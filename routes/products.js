@@ -41,6 +41,24 @@ router.post('/', async (req, res) => {
     }
 });
 
+// Get product images
+router.get('/:productId/images', async (req, res) => {
+    const { productId } = req.params;
+
+    try {
+        const images = await client.query(
+            'SELECT image_url FROM public.ProductImages WHERE product_id = $1',
+            [productId]
+        );
+
+        res.status(200).json({ images: images.rows.map(row => row.image_url) });
+    } catch (error) {
+        console.error('❌ Error fetching images:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
 // **Upload product images** - Deletes old images first before inserting new ones
 router.post('/:productId/images', async (req, res) => {
     const { productId } = req.params;
