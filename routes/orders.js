@@ -94,19 +94,23 @@ router.get('/all', async (req, res) => {
         // Base query to fetch all orders
         const query = `
             SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address
-            FROM public.Orders
+            FROM public."Orders"
             ORDER BY created_at DESC;
         `;
 
         // Execute the query
         const result = await client.query(query);
+        
+        // Respond with the result rows
         res.status(200).json({ orders: result.rows });
 
     } catch (error) {
+        // Log the error and send the error message
         console.error("Error fetching orders:", error);
         res.status(500).json({ message: "Internal server error", error: error.message });
     }
 });
+
 
 
 
