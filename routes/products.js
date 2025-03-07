@@ -264,21 +264,39 @@ router.get('/admin/products', async (req, res) => {
 
     try {
         const query = `
-            SELECT p.product_id, p.name, p.category_id, p.description,
-                COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images,
-                COALESCE(json_agg(DISTINCT jsonb_build_object(
-                    'size', ps.size,
-                    'quantity', ps.quantity,
-                    'stock_type', ps.stock_type
-                )::jsonb) FILTER (WHERE ps.size IS NOT NULL), '[]')::json AS stock
-            FROM public.Products p
-            LEFT JOIN public.ProductImages pi ON p.product_id = pi.product_id
-            LEFT JOIN public.ProductStock ps ON p.product_id = ps.product_id
-            WHERE ($1::TEXT IS NULL OR LOWER(p.name) LIKE LOWER($1) OR LOWER(p.description) LIKE LOWER($1))
-                AND ($2::INT IS NULL OR p.category_id = $2)
-            GROUP BY p.product_id
-            ORDER BY ${sortBy} ${order}
-            LIMIT $3 OFFSET $4;
+        SELECT 
+            p.product_id, 
+            p.name, 
+            p.category_id, 
+            p.description,
+            COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images,
+            COALESCE(json_agg(
+                jsonb_build_object(
+                    'size', stock_final.size,
+                    'quantity', stock_final.final_quantity
+                )
+            ) FILTER (WHERE stock_final.final_quantity IS NOT NULL), '[]')::json AS stock
+        FROM public.Products p
+        LEFT JOIN public.ProductImages pi ON p.product_id = pi.product_id
+        LEFT JOIN (
+            SELECT 
+                ps.product_id, 
+                ps.size, 
+                SUM(
+                    CASE 
+                        WHEN ps.stock_type = 'IN' THEN ps.quantity  -- Add for IN
+                        WHEN ps.stock_type = 'OUT' THEN -ps.quantity  -- Subtract for OUT
+                        ELSE 0 
+                    END
+                ) AS final_quantity
+            FROM public.ProductStock ps
+            GROUP BY ps.product_id, ps.size
+        ) stock_final ON p.product_id = stock_final.product_id
+        WHERE ($1::TEXT IS NULL OR LOWER(p.name) LIKE LOWER($1) OR LOWER(p.description) LIKE LOWER($1))
+        AND ($2::INT IS NULL OR p.category_id = $2)
+        GROUP BY p.product_id
+        ORDER BY ${sortBy} ${order}
+        LIMIT $3 OFFSET $4;
         `;
 
         const productsResult = await client.query(query, [
