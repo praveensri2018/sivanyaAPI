@@ -313,7 +313,7 @@ router.get('/admin/products', async (req, res) => {
     }
 });
 
-// 🔹 GET Single Product By ID (With Images, Stock, and Pricing)
+// GET Single Product By ID (With Images, Stock, and Pricing)
 router.get('/admin/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
