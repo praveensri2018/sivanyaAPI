@@ -94,7 +94,7 @@ router.get('/all', async (req, res) => {
         // Base query to fetch all orders
         const query = `
             SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address
-            FROM public."Orders"
+            FROM public.Orders
             ORDER BY created_at DESC;
         `;
 
