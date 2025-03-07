@@ -41,7 +41,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-// **Upload product images**
+// **Upload product images** - Deletes old images first before inserting new ones
 router.post('/:productId/images', async (req, res) => {
     const { productId } = req.params;
 
@@ -58,6 +58,21 @@ router.post('/:productId/images', async (req, res) => {
     }
 
     try {
+        // Step 1: Fetch existing images for the product
+        const existingImages = await client.query(
+            'SELECT image_url FROM public.ProductImages WHERE product_id = $1',
+            [productId]
+        );
+
+        // Step 2: Delete existing images from Cloudinary and database
+        for (const row of existingImages.rows) {
+            const publicId = row.image_url.split('/').pop().split('.')[0]; // Extract public ID from URL
+            await cloudinary.uploader.destroy(publicId); // Delete from Cloudinary
+        }
+
+        await client.query('DELETE FROM public.ProductImages WHERE product_id = $1', [productId]);
+
+        // Step 3: Upload new images
         for (const file of files) {
             const result = await cloudinary.uploader.upload(file.tempFilePath);
             await client.query(
@@ -66,12 +81,13 @@ router.post('/:productId/images', async (req, res) => {
             );
         }
 
-        res.status(201).json({ message: 'Images uploaded successfully' });
+        res.status(201).json({ message: 'Images updated successfully' });
     } catch (error) {
         console.error('❌ Error uploading images:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 
 
 // **Get all products**
