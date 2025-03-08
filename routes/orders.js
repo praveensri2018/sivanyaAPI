@@ -70,6 +70,19 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.get('/all', async (req, res) => {
+    try {
+        const query = 'SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address FROM public.Orders ORDER BY created_at DESC';
+        const { rows } = await client.query(query);
+
+        res.status(200).json({ orders: rows });
+    } catch (err) {
+        console.error('❌ Error fetching categories:', err);
+        res.status(500).json({ error: 'Error fetching categories' });
+    }
+});
+
+
 // **Get User's Orders**
 router.get('/:user_id', async (req, res) => {
     const { user_id } = req.params;
@@ -89,17 +102,6 @@ router.get('/:user_id', async (req, res) => {
     }
 });
 
-router.get('/all', async (req, res) => {
-    try {
-        const query = 'SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address FROM public.Orders ORDER BY created_at DESC';
-        const { rows } = await client.query(query);
-
-        res.status(200).json({ orders: rows });
-    } catch (err) {
-        console.error('❌ Error fetching categories:', err);
-        res.status(500).json({ error: 'Error fetching categories' });
-    }
-});
 
 // **Get Order Details**
 router.get('/details/:order_id', async (req, res) => {
