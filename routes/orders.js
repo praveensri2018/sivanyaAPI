@@ -91,26 +91,15 @@ router.get('/:user_id', async (req, res) => {
 
 router.get('/all', async (req, res) => {
     try {
-        console.log("Fetching orders..."); // Debugging log
+        const query = 'SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address FROM public.Orders ORDER BY created_at DESC';
+        const { rows } = await client.query(query);
 
-        const query = `
-            SELECT order_id, total_amount, order_status, payment_status, created_at, shipping_address
-            FROM public.Orders
-            ORDER BY created_at DESC;
-        `;
-
-        const result = await client.query(query);
-        
-        console.log("Orders fetched:", result.rows.length); // Debugging log
-        
-        res.status(200).json({ orders: result.rows });
-
-    } catch (error) {
-        console.error("Error fetching orders:", error);
-        res.status(500).json({ message: "Internal server error", error: error.message });
+        res.status(200).json({ orders: rows });
+    } catch (err) {
+        console.error('❌ Error fetching categories:', err);
+        res.status(500).json({ error: 'Error fetching categories' });
     }
 });
-
 
 // **Get Order Details**
 router.get('/details/:order_id', async (req, res) => {
