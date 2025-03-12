@@ -85,6 +85,28 @@ router.get('/user/:user_id', async (req, res) => {
     }
 });
 
+router.get('/admin', async (req, res) => {
+    const { user_id } = req.params;
+
+    try {
+        const query = `
+            SELECT p.payment_id, p.order_id, u.name AS user_name, p.amount, p.payment_method, p.payment_reference, p.payment_date
+            FROM public.Payments p JOIN public.Orders o ON p.order_id = o.order_id JOIN public.Users u ON o.user_id = u.user_id;
+        `;
+        const result = await client.query(query, [user_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No payments found for this user" });
+        }
+
+        res.status(200).json({ payments: result.rows });
+
+    } catch (error) {
+        console.error("Error fetching user payments:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 // **Update Payment Status**
 router.put('/:payment_id', async (req, res) => {
     const { payment_id } = req.params;
