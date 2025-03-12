@@ -41,6 +41,21 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.get('/admin', async (req, res) => {
+    try {
+        const query = ` SELECT p.payment_id, p.order_id, u.name AS user_name, p.amount, p.payment_method, p.payment_reference, p.payment_date
+                FROM public.Payments p JOIN public.Orders o ON p.order_id = o.order_id JOIN public.Users u ON o.user_id = u.user_id 
+     ORDER BY p.payment_date DESC`;
+        const { rows } = await client.query(query);
+
+        res.status(200).json({ payments: rows });
+    } catch (err) {
+        console.error('❌ Error fetching payments:', err);
+        res.status(500).json({ error: 'Error fetching payments' });
+    }
+});
+
+
 // **Get Payment Details for an Order**
 router.get('/:order_id', async (req, res) => {
     const { order_id } = req.params;
@@ -85,19 +100,6 @@ router.get('/user/:user_id', async (req, res) => {
     }
 });
 
-router.get('/admin', async (req, res) => {
-    try {
-        const query = ` SELECT p.payment_id, p.order_id, u.name AS user_name, p.amount, p.payment_method, p.payment_reference, p.payment_date
-                FROM public.Payments p JOIN public.Orders o ON p.order_id = o.order_id JOIN public.Users u ON o.user_id = u.user_id 
-     ORDER BY p.payment_date DESC`;
-        const { rows } = await client.query(query);
-
-        res.status(200).json({ payments: rows });
-    } catch (err) {
-        console.error('❌ Error fetching payments:', err);
-        res.status(500).json({ error: 'Error fetching payments' });
-    }
-});
 
 // **Update Payment Status**
 router.put('/:payment_id', async (req, res) => {
