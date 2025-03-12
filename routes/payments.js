@@ -12,7 +12,7 @@ router.post('/', async (req, res) => {
     if (!order_id || !user_id || !amount || !payment_method || !payment_reference) {
         return res.status(400).json({ message: "All fields are required" });
     }
-
+ 
     try {
         // **Check if Order Exists and Payment is Allowed**
         const orderCheckQuery = 'SELECT * FROM public.Orders WHERE order_id = $1 AND user_id = $2';
