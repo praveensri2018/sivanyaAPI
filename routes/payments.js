@@ -8,7 +8,7 @@ client.connect();
 // **Process Payment**
 router.post('/', async (req, res) => {
     const { order_id, user_id, amount, payment_method, payment_reference } = req.body;
-
+  
     if (!order_id || !user_id || !amount || !payment_method || !payment_reference) {
         return res.status(400).json({ message: "All fields are required" });
     }
