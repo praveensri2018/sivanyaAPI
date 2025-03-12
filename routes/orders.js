@@ -7,8 +7,8 @@ client.connect();
 
 // **Place an Order**
 router.post('/', async (req, res) => {
-    const { user_id, shipping_address, payment_method, payment_reference } = req.body;  
-   
+    const { user_id, shipping_address, payment_method, payment_reference } = req.body;
+
     if (!user_id) {
         return res.status(400).json({ message: "User ID is required" });
     }
@@ -22,19 +22,7 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        console.log("Fetching amount from Card table...");
-        const cardAmountQuery = `SELECT amount FROM public.Card WHERE user_id = $1`;
-        const cardAmountResult = await client.query(cardAmountQuery, [user_id]);
-
-        if (cardAmountResult.rows.length === 0) {
-            console.log("No amount found in Card table for user_id:", user_id);
-            return res.status(400).json({ message: "No amount found in Card table for this user" });
-        }
-
-        const totalAmount = parseFloat(cardAmountResult.rows[0].amount); // Fetch INR amount
-        console.log("Amount from Card table:", totalAmount);
-
-        console.log("Fetching cart items...");
+        // **Retrieve Cart Items**
         const cartQuery = `
             SELECT c.product_id, c.size, c.quantity, pp.price
             FROM public.Cart c
@@ -45,53 +33,39 @@ router.post('/', async (req, res) => {
         const cartResult = await client.query(cartQuery, [user_id]);
 
         if (cartResult.rows.length === 0) {
-            console.log("Cart is empty for user_id:", user_id);
             return res.status(400).json({ message: "Cart is empty" });
         }
 
-        const calculatedAmount = cartResult.rows.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-        console.log("Calculated Cart Total:", calculatedAmount);
+        // **Calculate Total Amount**
+        const totalAmount = cartResult.rows.reduce((sum, item) => sum + (item.quantity * item.price), 0);
 
-        if (calculatedAmount !== totalAmount) {
-            console.log("Mismatch: Cart total =", calculatedAmount, "but Card amount =", totalAmount);
-            return res.status(400).json({ message: "Payment amount does not match order total" });
-        }
-
-        console.log("Creating order...");
+        // **Create Order**
         const orderQuery = `
-            INSERT INTO public.Orders (user_id, total_amount, shipping_address) 
-            VALUES ($1, $2, $3) RETURNING *;
+            INSERT INTO public.Orders (user_id, total_amount, shipping_address, payment_status) 
+            VALUES ($1, $2, $3, 'Pending') RETURNING *;
         `;
         const orderResult = await client.query(orderQuery, [user_id, totalAmount, shipping_address]);
         const order_id = orderResult.rows[0].order_id;
-        console.log("Order created with ID:", order_id);
 
-        console.log("Inserting payment record...");
+        // **Insert Payment Record**
         const paymentQuery = `
             INSERT INTO public.Payments (order_id, user_id, amount, payment_method, payment_reference, status)
             VALUES ($1, $2, $3, $4, $5, 'Completed') RETURNING *;
         `;
         await client.query(paymentQuery, [order_id, user_id, totalAmount, payment_method, payment_reference]);
 
-        console.log("Inserting order details...");
+        // **Update Order Payment Status**
+        await client.query(`UPDATE public.Orders SET payment_status = 'Completed' WHERE order_id = $1`, [order_id]);
+
+        // **Insert Order Details**
         const orderDetailsQuery = `
             INSERT INTO public.OrderDetails (order_id, product_id, size, quantity, price)
             VALUES ${cartResult.rows.map((_, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(", ")}
         `;
         const orderDetailsValues = [order_id, ...cartResult.rows.flatMap(item => [item.product_id, item.size, item.quantity, item.price])];
-        console.log("Order Details Values:", orderDetailsValues);
         await client.query(orderDetailsQuery, orderDetailsValues);
 
-        console.log("Updating stock...");
-        const stockQuery = `
-            INSERT INTO public.ProductStock (product_id, size, quantity, stock_type)
-            VALUES ${cartResult.rows.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, 'OUT')`).join(", ")}
-        `;
-        const stockValues = cartResult.rows.flatMap(item => [item.product_id, item.size, item.quantity]);
-        console.log("Stock Values:", stockValues);
-        await client.query(stockQuery, stockValues);
-
-        console.log("Clearing user cart...");
+        // **Clear User's Cart**
         await client.query('DELETE FROM public.Cart WHERE user_id = $1', [user_id]);
 
         res.status(201).json({ message: "Order placed successfully", order: orderResult.rows[0] });
@@ -101,6 +75,7 @@ router.post('/', async (req, res) => {
         res.status(500).json({ message: "Internal server error", error: error.message });
     }
 });
+
 
 
 
