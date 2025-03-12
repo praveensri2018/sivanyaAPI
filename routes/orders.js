@@ -7,9 +7,8 @@ client.connect();
 
 // **Place an Order**
 
-
 router.post('/', async (req, res) => {
-    const { user_id, shipping_address, payment_method, payment_reference } = req.body;  // Get payment details from request body
+    const { user_id, shipping_address, payment_method, payment_reference } = req.body;  
 
     if (!user_id) {
         return res.status(400).json({ message: "User ID is required" });
@@ -24,15 +23,15 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        // **Verify Payment Status**
-        const paymentVerificationQuery = `
-            SELECT status FROM public.Payments WHERE payment_reference = $1;
-        `;
-        const paymentVerificationResult = await client.query(paymentVerificationQuery, [payment_reference]);
+        // **Retrieve Total Amount from Card Table**
+        const cardAmountQuery = `SELECT amount FROM public.Card WHERE user_id = $1`;
+        const cardAmountResult = await client.query(cardAmountQuery, [user_id]);
 
-        if (paymentVerificationResult.rows.length === 0 || paymentVerificationResult.rows[0].status !== 'Completed') {
-            return res.status(400).json({ message: "Payment not completed" });
+        if (cardAmountResult.rows.length === 0) {
+            return res.status(400).json({ message: "No amount found in Card table for this user" });
         }
+
+        const totalAmount = parseFloat(cardAmountResult.rows[0].amount); // Fetch INR amount
 
         // **Retrieve Cart Items**
         const cartQuery = `
@@ -48,8 +47,12 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ message: "Cart is empty" });
         }
 
-        // **Calculate Total Amount**
-        const totalAmount = cartResult.rows.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        // **Calculate Cart Total**
+        const calculatedAmount = cartResult.rows.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+
+        if (calculatedAmount !== totalAmount) {
+            return res.status(400).json({ message: "Payment amount does not match order total" });
+        }
 
         // **Create Order with Shipping Address**
         const orderQuery = `
@@ -58,6 +61,13 @@ router.post('/', async (req, res) => {
         `;
         const orderResult = await client.query(orderQuery, [user_id, totalAmount, shipping_address]);
         const order_id = orderResult.rows[0].order_id;
+
+        // **Insert Payment Record**
+        const paymentQuery = `
+            INSERT INTO public.Payments (order_id, user_id, amount, payment_method, payment_reference, status)
+            VALUES ($1, $2, $3, $4, $5, 'Completed') RETURNING *;
+        `;
+        await client.query(paymentQuery, [order_id, user_id, totalAmount, payment_method, payment_reference]);
 
         // **Insert Order Details**
         const orderDetailsQuery = `
@@ -85,6 +95,7 @@ router.post('/', async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 });
+
 
 /*
 router.post('/', async (req, res) => {
