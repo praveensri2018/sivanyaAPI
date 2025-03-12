@@ -8,7 +8,7 @@ client.connect();
 // **Place an Order**
 router.post('/', async (req, res) => {
     const { user_id, shipping_address, payment_method, payment_reference } = req.body;  
-
+   
     if (!user_id) {
         return res.status(400).json({ message: "User ID is required" });
     }
