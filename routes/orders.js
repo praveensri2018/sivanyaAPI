@@ -3,7 +3,7 @@ const { Client } = require('pg');
 
 const router = express.Router();
 const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-client.connect();
+client.connect();  
 
 // **Place an Order**
 router.post('/', async (req, res) => {
