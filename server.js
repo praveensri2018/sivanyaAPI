@@ -38,6 +38,7 @@ const supportRoutes = require('./routes/support');
 const productstockRoutes = require('./routes/productstock');
 const productpricingRoutes = require('./routes/productpricing');
 const pricingRoutes = require('./routes/pricing');
+const adminChatRoutes = require('./routes/adminChat'); // Admin chat
 
 
 app.use('/auth', authRoutes);
@@ -50,6 +51,7 @@ app.use('/support', supportRoutes);
 app.use('/product-stock', productstockRoutes);
 app.use('/productpricing', productpricingRoutes);
 app.use('/pricing', pricingRoutes);
+app.use('/admin/chat', adminChatRoutes); // Admin chat
 
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
