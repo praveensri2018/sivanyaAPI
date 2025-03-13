@@ -167,32 +167,15 @@ router.delete('/chat/:chat_id', async (req, res) => {
     }
 });
 
-const verifyAdmin = async (req, res, next) => {
-    const { user_id } = req.body; // Assuming user_id is sent in request body
 
-    try {
-        const query = `SELECT is_admin FROM public.Users WHERE user_id = $1`;
-        const result = await client.query(query, [user_id]);
-
-        if (result.rows.length === 0 || !result.rows[0].is_admin) {
-            return res.status(403).json({ message: "Access denied. Admins only." });
-        }
-
-        next(); // Proceed to the next middleware
-    } catch (error) {
-        console.error("Error verifying admin:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-};
-
-
-router.get('/admin/chat/conversations', verifyAdmin, async (req, res) => {
+router.get('/admin/chat/conversations', async (req, res) => {
     try {
         const query = `
             SELECT DISTINCT u.user_id, u.name, u.email 
             FROM public.Users u
             JOIN public.SupportChat sc 
-            ON u.user_id = sc.sender_id OR u.user_id = sc.receiver_id;
+                ON u.user_id = sc.sender_id OR u.user_id = sc.receiver_id
+            WHERE u.user_id != $1;
         `;
         const result = await client.query(query);
 
@@ -208,7 +191,7 @@ router.get('/admin/chat/conversations', verifyAdmin, async (req, res) => {
     }
 });
 
-router.get('/admin/chat/:user1_id/:user2_id', verifyAdmin, async (req, res) => {
+router.get('/admin/chat/:user1_id/:user2_id',  async (req, res) => {
     const { user1_id, user2_id } = req.params;
 
     try {
