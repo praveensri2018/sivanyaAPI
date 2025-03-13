@@ -7,7 +7,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { r
 client.connect();
 
 // **Admin: Get All Chat Conversations**
-router.get('/admin/chat/conversations', async (req, res) => {
+router.get('/conversations', async (req, res) => {
     try {
         const query = `
             SELECT DISTINCT u.user_id, u.name, u.email 
@@ -30,7 +30,7 @@ router.get('/admin/chat/conversations', async (req, res) => {
 });
 
 // **Admin: Get Messages Between Two Users**
-router.get('/admin/chat/:user1_id/:user2_id', async (req, res) => {
+router.get('/:user1_id/:user2_id', async (req, res) => {
     const user1_id = parseInt(req.params.user1_id, 10);
     const user2_id = parseInt(req.params.user2_id, 10);
 
