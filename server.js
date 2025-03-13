@@ -38,7 +38,7 @@ const supportRoutes = require('./routes/support');
 const productstockRoutes = require('./routes/productstock');
 const productpricingRoutes = require('./routes/productpricing');
 const pricingRoutes = require('./routes/pricing');
-const adminChatRoutes = require('./routes/adminChat'); // Admin chat
+const adminChatRoutes = require('./routes/adminChatRoutes'); // Admin chat
 
 
 app.use('/auth', authRoutes);
