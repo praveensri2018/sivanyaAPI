@@ -167,4 +167,81 @@ router.delete('/chat/:chat_id', async (req, res) => {
     }
 });
 
+const verifyAdmin = async (req, res, next) => {
+    const { user_id } = req.body; // Assuming user_id is sent in request body
+
+    try {
+        const query = `SELECT is_admin FROM public.Users WHERE user_id = $1`;
+        const result = await client.query(query, [user_id]);
+
+        if (result.rows.length === 0 || !result.rows[0].is_admin) {
+            return res.status(403).json({ message: "Access denied. Admins only." });
+        }
+
+        next(); // Proceed to the next middleware
+    } catch (error) {
+        console.error("Error verifying admin:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+
+router.get('/admin/chat/conversations', verifyAdmin, async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT u.user_id, u.name, u.email 
+            FROM public.Users u
+            JOIN public.SupportChat sc 
+            ON u.user_id = sc.sender_id OR u.user_id = sc.receiver_id;
+        `;
+        const result = await client.query(query);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No conversations found" });
+        }
+
+        res.status(200).json({ conversations: result.rows });
+
+    } catch (error) {
+        console.error("Error retrieving all conversations:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+router.get('/admin/chat/:user1_id/:user2_id', verifyAdmin, async (req, res) => {
+    const { user1_id, user2_id } = req.params;
+
+    try {
+        const query = `
+            SELECT sc.*, ms.status, ms.updated_at 
+            FROM public.SupportChat sc
+            LEFT JOIN LATERAL (
+                SELECT status, updated_at
+                FROM public.MessageStatus ms
+                WHERE ms.chat_id = sc.chat_id
+                ORDER BY ms.updated_at DESC
+                LIMIT 1
+            ) ms ON true
+            WHERE (sc.sender_id = $1 AND sc.receiver_id = $2) OR 
+                  (sc.sender_id = $2 AND sc.receiver_id = $1)
+            ORDER BY sc.sent_at ASC;
+        `;
+
+        const result = await client.query(query, [user1_id, user2_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No messages found" });
+        }
+
+        res.status(200).json({ chats: result.rows });
+
+    } catch (error) {
+        console.error("Error retrieving chat messages:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+
+
+
 module.exports = router;
