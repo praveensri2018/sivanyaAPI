@@ -167,15 +167,14 @@ router.delete('/chat/:chat_id', async (req, res) => {
     }
 });
 
-
+// **Admin: Get All Chat Conversations**
 router.get('/admin/chat/conversations', async (req, res) => {
     try {
         const query = `
             SELECT DISTINCT u.user_id, u.name, u.email 
             FROM public.Users u
             JOIN public.SupportChat sc 
-                ON u.user_id = sc.sender_id OR u.user_id = sc.receiver_id
-            WHERE u.user_id != $1;
+            ON u.user_id = sc.sender_id OR u.user_id = sc.receiver_id;
         `;
         const result = await client.query(query);
 
@@ -191,8 +190,14 @@ router.get('/admin/chat/conversations', async (req, res) => {
     }
 });
 
-router.get('/admin/chat/:user1_id/:user2_id',  async (req, res) => {
-    const { user1_id, user2_id } = req.params;
+// **Admin: Get Messages Between Two Users**
+router.get('/admin/chat/:user1_id/:user2_id', async (req, res) => {
+    const user1_id = parseInt(req.params.user1_id, 10);
+    const user2_id = parseInt(req.params.user2_id, 10);
+
+    if (isNaN(user1_id) || isNaN(user2_id)) {
+        return res.status(400).json({ message: "Invalid user IDs" });
+    }
 
     try {
         const query = `
@@ -223,6 +228,7 @@ router.get('/admin/chat/:user1_id/:user2_id',  async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 });
+
 
 
 
