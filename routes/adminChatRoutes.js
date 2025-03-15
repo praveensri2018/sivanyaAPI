@@ -14,7 +14,7 @@ router.get('/conversations', async (req, res) => {
             FROM public.Users u
             JOIN public.SupportChat sc 
             ON u.user_id = sc.sender_id OR u.user_id = sc.receiver_id
-            WHERE u.user_id != $1;;
+       ;
         `;
         const result = await client.query(query);
 
